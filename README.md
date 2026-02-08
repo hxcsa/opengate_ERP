@@ -29,29 +29,24 @@ OpenGate ERP is a modern, high-performance Enterprise Resource Planning system d
 ## 🚀 Deployment Guide (Step-by-Step)
 
 ### 1. Backend Deployment (Option A: Railway - EASIEST 🏆)
-Railway is currently the most "hands-off" way to deploy this.
+Railway is the most reliable way to deploy this monorepo.
 
 1.  **Railway Dashboard**: Go to **[Railway.app](https://railway.app)**.
 2.  **New Project**: Select "Deploy from GitHub repo".
-3.  **Configure**:
-    *   Railway will detect the `railway.json` I added.
-    *   **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT` (Paste raw JSON from `service_account.json`).
-4.  **Done**: It will automatically find the Dockerfile and deploy.
+3.  **Automatic Detection**: Railway will find the `railway.json`.
+4.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT` (Paste raw JSON).
+5.  **Done**: It will build using the root as context.
 
-### 2. Backend Deployment (Option B: Google Cloud Run - PRODUCTION)
-Best for production stability.
+### 2. Backend Deployment (Option B: Google Cloud Run)
+1.  **Deploy new service**: 
+    *   **Source directory**: `.` (Root of repo)
+    *   **Dockerfile path**: `backend/Dockerfile`
+2.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
 
-1.  **GCP Console**: Go to **[Cloud Run](https://console.cloud.google.com/run)**.
-2.  **Deploy new service**: 
-    *   **Source directory**: `backend`
-    *   **Dockerfile path**: `Dockerfile`
+### 3. Backend Deployment (Option C: Render)
+1.  **Docker Context**: `.` (Root of repo)
+2.  **Dockerfile Path**: `backend/Dockerfile`
 3.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
-
-### 3. Backend Deployment (Option C: Render - FREE)
-1.  Connect repo.
-2.  **Docker Context**: `.`
-3.  **Dockerfile Path**: `backend/Dockerfile`
-4.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
 4.  **Security (Environment Variables)**:
     *   Go to **Variables & Secrets**.
     *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
