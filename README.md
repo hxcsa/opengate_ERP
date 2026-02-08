@@ -28,28 +28,30 @@ OpenGate ERP is a modern, high-performance Enterprise Resource Planning system d
 
 ## 🚀 Deployment Guide (Step-by-Step)
 
-### 1. Backend Deployment (Google Cloud Run - RECOMMENDED)
-We use Google Cloud Run for a scalable, production-ready backend.
+### 1. Backend Deployment (Option A: Railway - EASIEST 🏆)
+Railway is currently the most "hands-off" way to deploy this.
+
+1.  **Railway Dashboard**: Go to **[Railway.app](https://railway.app)**.
+2.  **New Project**: Select "Deploy from GitHub repo".
+3.  **Configure**:
+    *   Railway will detect the `railway.json` I added.
+    *   **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT` (Paste raw JSON from `service_account.json`).
+4.  **Done**: It will automatically find the Dockerfile and deploy.
+
+### 2. Backend Deployment (Option B: Google Cloud Run - PRODUCTION)
+Best for production stability.
 
 1.  **GCP Console**: Go to **[Cloud Run](https://console.cloud.google.com/run)**.
 2.  **Deploy new service**: 
-    *   **Source**: Select "Continuously deploy from a repository".
-    *   **GitHub**: Connect your `opengate_ERP` repo.
-    *   **Build Settings**:
-        *   **Source directory**: `backend`
-        *   **Build Type**: `Dockerfile`
-        *   **Dockerfile path**: `Dockerfile`
-3.  **Environment Variables**:
-    *   Go to **Variables & Secrets**.
-    *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
-    *   **Value**: Paste the *entire* raw JSON content of your `service_account.json`.
-4.  **Performance**: Set "Minimum instances" to `1` if you want to avoid cold starts.
+    *   **Source directory**: `backend`
+    *   **Dockerfile path**: `Dockerfile`
+3.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
 
-### 2. Backend Deployment (Option B: Render - FREE)
-Render is an easier free alternative.
+### 3. Backend Deployment (Option C: Render - FREE)
 1.  Connect repo.
-2.  **Docker Context**: `backend`
-3.  **Dockerfile Path**: `Dockerfile`
+2.  **Docker Context**: `.`
+3.  **Dockerfile Path**: `backend/Dockerfile`
+4.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
 4.  **Security (Environment Variables)**:
     *   Go to **Variables & Secrets**.
     *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
