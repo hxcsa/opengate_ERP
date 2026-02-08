@@ -38,7 +38,7 @@ Render is the easiest way to get the backend live for free.
     *   **Name**: `opengate-erp-backend`
     *   **Runtime**: `Docker`
     *   **Docker Context**: `backend`
-    *   **Dockerfile Path**: `backend/Dockerfile`
+    *   **Dockerfile Path**: `Dockerfile`
 5.  **Environment Variables**:
     *   Add `FIREBASE_SERVICE_ACCOUNT`: (Paste raw JSON from `service_account.json`).
 6.  **Deploy**: Render will build the Docker image and host it. 
