@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isAccountant() {
+      return isAuthenticated() && (getUserRole() == 'accountant' || isAdmin());
+    }
+    
+    function isStorekeeper() {
+      return isAuthenticated() && (getUserRole() == 'storekeeper' || isAdmin());
+    }
+    
+    function isViewer() {
+      return isAuthenticated();
+    }
+    
+    function belongsToCompany(companyId) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.company_id == companyId;
+    }
+    
+    function isDocumentDraft(docId, collection) {
+      return get(/databases/$(database)/documents/$(collection)/$(docId)).data.status == 'DRAFT';
+    }
+    
+    // ============================================
+    // AUDIT LOGS - IMMUTABLE (NO UPDATES/DELETES)
+    // ============================================
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // IMMUTABLE
+    }
+    
+    // ============================================
+    // ACCOUNTS (Chart of Accounts)
+    // ============================================
+    match /accounts/{accountId} {
+      allow read: if isViewer();
+      allow create: if isAccountant();
+      allow update: if isAccountant();
+      allow delete: if false; // NO DELETES - void instead
+    }
+    
+    // ============================================
+    // JOURNAL ENTRIES
+    // ============================================
+    match /journal_entries/{jeId} {
+      allow read: if isViewer();
+      allow create: if isAccountant();
+      // Can only update if DRAFT
+      allow update: if isAccountant() && resource.data.status == 'DRAFT';
+      allow delete: if false; // NO DELETES - void instead
+    }
+    
+    // ============================================
+    // ITEMS (Inventory)
+    // ============================================
+    match /items/{itemId} {
+      allow read: if isViewer();
+      allow create: if isStorekeeper() || isAccountant();
+      allow update: if isStorekeeper() || isAccountant();
+      allow delete: if false; // NO DELETES
+    }
+    
+    // ============================================
+    // STOCK LEDGER - IMMUTABLE
+    // ============================================
+    match /stock_ledger/{entryId} {
+      allow read: if isViewer();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // IMMUTABLE
+    }
+    
+    // ============================================
+    // WAREHOUSES
+    // ============================================
+    match /warehouses/{warehouseId} {
+      allow read: if isViewer();
+      allow create, update: if isStorekeeper() || isAdmin();
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // FISCAL PERIODS
+    // ============================================
+    match /fiscal_periods/{periodId} {
+      allow read: if isViewer();
+      allow create: if isAdmin();
+      allow update: if isAdmin(); // Only admin can close/reopen
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // SEQUENCES (Document Numbering)
+    // ============================================
+    match /sequences/{seqId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // ============================================
+    // IDEMPOTENCY KEYS
+    // ============================================
+    match /idempotency_keys/{keyId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ============================================
+    // USERS
+    // ============================================
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == userId;
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // COMPANIES
+    // ============================================
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && belongsToCompany(companyId);
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+  }
+}
