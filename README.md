@@ -28,33 +28,28 @@ OpenGate ERP is a modern, high-performance Enterprise Resource Planning system d
 
 ## 🚀 Deployment Guide (Step-by-Step)
 
-### 1. Backend Deployment (Option A: Render - FREE & EASIEST)
-Render is the easiest way to get the backend live for free.
+### 1. Backend Deployment (Google Cloud Run - RECOMMENDED)
+We use Google Cloud Run for a scalable, production-ready backend.
 
-1.  Create a free account at **[Render.com](https://render.com)**.
-2.  Click **"New +"** -> **"Web Service"**.
-3.  Connect your GitHub repository `opengate_ERP`.
-4.  **Settings**:
-    *   **Name**: `opengate-erp-backend`
-    *   **Runtime**: `Docker`
-    *   **Docker Context**: `backend`
-    *   **Dockerfile Path**: `Dockerfile`
-5.  **Environment Variables**:
-    *   Add `FIREBASE_SERVICE_ACCOUNT`: (Paste raw JSON from `service_account.json`).
-6.  **Deploy**: Render will build the Docker image and host it. 
-    *   *Note: Free instances spin down after 15m of inactivity.*
-
-### 2. Backend Deployment (Option B: Google Cloud Run)
-Best for production stability.
-
-1.  **Preparation**: Ensure your `service_account.json` is ready.
-2.  **GCP Console**: Go to **[Cloud Run](https://console.cloud.google.com/run)**.
-3.  **Deploy new service**: 
+1.  **GCP Console**: Go to **[Cloud Run](https://console.cloud.google.com/run)**.
+2.  **Deploy new service**: 
     *   **Source**: Select "Continuously deploy from a repository".
     *   **GitHub**: Connect your `opengate_ERP` repo.
     *   **Build Settings**:
-        *   Context: `backend`
-        *   Dockerfile: `backend/Dockerfile`
+        *   **Source directory**: `backend`
+        *   **Build Type**: `Dockerfile`
+        *   **Dockerfile path**: `Dockerfile`
+3.  **Environment Variables**:
+    *   Go to **Variables & Secrets**.
+    *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
+    *   **Value**: Paste the *entire* raw JSON content of your `service_account.json`.
+4.  **Performance**: Set "Minimum instances" to `1` if you want to avoid cold starts.
+
+### 2. Backend Deployment (Option B: Render - FREE)
+Render is an easier free alternative.
+1.  Connect repo.
+2.  **Docker Context**: `backend`
+3.  **Dockerfile Path**: `Dockerfile`
 4.  **Security (Environment Variables)**:
     *   Go to **Variables & Secrets**.
     *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
