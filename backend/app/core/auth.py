@@ -11,24 +11,16 @@ async def get_current_user(request: Request):
     try:
         # Verify the JWT with a reasonable timeout
         decoded_token = auth.verify_id_token(id_token, check_revoked=False)
+        # Extract custom claims directly from the token (Optimized: No DB fetch!)
         uid = decoded_token["uid"]
+        role = decoded_token.get("role", "viewer")
+        company_id = decoded_token.get("company_id")
         
-        # Fetch user profile from Firestore
-        db = get_db()
-        user_doc = db.collection("users").document(uid).get()
-        
-        if user_doc.exists:
-            profile = user_doc.to_dict()
-            role = profile.get("role", "viewer")
-            company_id = profile.get("company_id")
-            
-            decoded_token.update({
-                "role": role,
-                "company_id": company_id
-            })
-        else:
-            # No Firestore profile - default to viewer
-            decoded_token.update({"role": "viewer", "company_id": None})
+        # Add to the returned token for convenience
+        decoded_token.update({
+            "role": role,
+            "company_id": company_id
+        })
             
         return decoded_token
     except Exception as e:

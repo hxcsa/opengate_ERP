@@ -89,3 +89,9 @@ class DeliveryNoteCreate(BaseModel):
     date: Optional[datetime] = None
     lines: List[DeliveryNoteLine]
     customer_account_id: str
+# --- User/Employee Schemas ---
+class EmployeeCreate(BaseModel):
+    email: str
+    password: str
+    role: str
+    allowed_tabs: Optional[List[str]] = None

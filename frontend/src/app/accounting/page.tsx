@@ -11,6 +11,37 @@ import JournalViewer from "@/components/JournalViewer";
 import TrialBalanceView from "@/components/TrialBalanceView";
 import BalanceSheetView from "@/components/BalanceSheetView";
 import { useLanguage } from "@/contexts/LanguageContext";
+import React, { useCallback, memo } from "react";
+
+const FinanceAction = memo(({ title, sub, icon, color, onClick }: any) => (
+    <button
+        onClick={onClick}
+        className={`p-6 rounded-2xl text-white flex flex-col items-center justify-center gap-3 hover:scale-[1.03] transition-all shadow-lg active:scale-95 ${color}`}
+    >
+        <div className="p-3 bg-white/10 border border-white/20 rounded-xl shadow-inner">{icon}</div>
+        <div className="text-center">
+            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-0.5">{sub}</p>
+            <h4 className="font-black text-lg">{title}</h4>
+        </div>
+    </button>
+));
+FinanceAction.displayName = "FinanceAction";
+
+const AccountRow = memo(({ acc }: any) => (
+    <tr className={`${acc.is_group ? "bg-slate-50/50 font-black" : "hover:bg-slate-50"} transition-colors`}>
+        <td className="font-mono text-xs text-slate-400">{acc.code}</td>
+        <td className="text-slate-800 font-bold">{acc.name}</td>
+        <td>
+            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${acc.type === 'Asset' ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                {acc.type}
+            </span>
+        </td>
+        <td className="text-right font-black tabular-nums text-slate-700">
+            {Number(acc.balance || 0).toLocaleString()} <span className="text-[10px] opacity-40">IQD</span>
+        </td>
+    </tr>
+));
+AccountRow.displayName = "AccountRow";
 
 export default function Accounting() {
     const [coa, setCoa] = useState<any[]>([]);
@@ -23,7 +54,7 @@ export default function Accounting() {
     const [showBalanceSheetModal, setShowBalanceSheetModal] = useState(false);
     const { t } = useLanguage();
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const [coaRes, bsRes, tbRes] = await Promise.all([
@@ -58,11 +89,11 @@ export default function Accounting() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -115,18 +146,7 @@ export default function Accounting() {
                                 {loading ? (
                                     <tr><td colSpan={4} className="text-center py-20 text-slate-400 font-bold">Loading Financial Data...</td></tr>
                                 ) : coa.map((acc: any) => (
-                                    <tr key={acc.id} className={`${acc.is_group ? "bg-slate-50/50 font-black" : "hover:bg-slate-50"} transition-colors`}>
-                                        <td className="font-mono text-xs text-slate-400">{acc.code}</td>
-                                        <td className="text-slate-800 font-bold">{acc.name}</td>
-                                        <td>
-                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${acc.type === 'Asset' ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
-                                                {acc.type}
-                                            </span>
-                                        </td>
-                                        <td className="text-right font-black tabular-nums text-slate-700">
-                                            {Number(acc.balance || 0).toLocaleString()} <span className="text-[10px] opacity-40">IQD</span>
-                                        </td>
-                                    </tr>
+                                    <AccountRow key={acc.id} acc={acc} />
                                 ))}
                             </tbody>
                         </table>
@@ -205,14 +225,3 @@ export default function Accounting() {
     );
 }
 
-function FinanceAction({ title, sub, icon, color }: any) {
-    return (
-        <button className={`p-6 rounded-2xl text-white flex flex-col items-center justify-center gap-3 hover:scale-[1.03] transition-all shadow-lg active:scale-95 ${color}`}>
-            <div className="p-3 bg-white/10 border border-white/20 rounded-xl shadow-inner">{icon}</div>
-            <div className="text-center">
-                <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-0.5">{sub}</p>
-                <h4 className="font-black text-lg">{title}</h4>
-            </div>
-        </button>
-    );
-}

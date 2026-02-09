@@ -4,6 +4,64 @@ import { useEffect, useState } from "react";
 import { Plus, Truck, Check, Clock, FileText, Search } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import PurchaseOrderForm from "@/components/PurchaseOrderForm";
+import React, { useCallback, memo } from "react";
+
+const StatusBadge = memo(({ status }: { status: string }) => {
+    const colors: Record<string, string> = {
+        DRAFT: "bg-slate-100 text-slate-600",
+        APPROVED: "bg-emerald-100 text-emerald-600",
+        RECEIVED: "bg-blue-100 text-blue-600",
+        PAID: "bg-purple-100 text-purple-600"
+    };
+    return (
+        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${colors[status] || "bg-slate-100 text-slate-600"}`}>
+            {status}
+        </span>
+    );
+});
+StatusBadge.displayName = "StatusBadge";
+
+const StatCard = memo(({ label, value, icon, color }: any) => (
+    <div className={`${color} text-white p-6 rounded-2xl flex items-center justify-between shadow-lg hover:scale-[1.02] transition-transform`}>
+        <div>
+            <p className="text-[10px] font-black opacity-70 uppercase tracking-widest">{label}</p>
+            <h4 className="text-2xl font-black">{value}</h4>
+        </div>
+        <div className="p-3 bg-white/10 rounded-xl">{icon}</div>
+    </div>
+));
+StatCard.displayName = "StatCard";
+
+const PurchaseOrderRow = memo(({ po, onApprove }: any) => (
+    <tr className="hover:bg-slate-50/50 transition-colors">
+        <td className="px-6 py-4 font-mono text-xs font-black text-indigo-600">{po.number}</td>
+        <td className="px-6 py-4 font-bold text-slate-700">{po.supplier_name}</td>
+        <td className="px-6 py-4 font-mono text-sm font-black">{Number(po.total).toLocaleString()} {po.currency}</td>
+        <td className="px-6 py-4">
+            <StatusBadge status={po.status} />
+        </td>
+        <td className="px-6 py-4 text-right">
+            <div className="flex justify-end gap-2 items-center">
+                <button
+                    onClick={() => window.open(`/api/purchasing/invoice/${po.id}`, '_blank')}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Download Order"
+                >
+                    <FileText size={18} />
+                </button>
+                {po.status === "DRAFT" && (
+                    <button
+                        onClick={() => onApprove(po.id)}
+                        className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors active:scale-95"
+                    >
+                        <Check size={12} className="inline mr-1" /> Approve
+                    </button>
+                )}
+            </div>
+        </td>
+    </tr>
+));
+PurchaseOrderRow.displayName = "PurchaseOrderRow";
 
 export default function PurchasingPage() {
     const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
@@ -11,7 +69,7 @@ export default function PurchasingPage() {
     const [showPOForm, setShowPOForm] = useState(false);
     const { t } = useLanguage();
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch("/api/purchase-orders");
@@ -22,14 +80,14 @@ export default function PurchasingPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
-    const approvePO = async (poId: string) => {
+    const approvePO = useCallback(async (poId: string) => {
         await fetch(`/api/purchase-orders/${poId}/approve`, { method: "POST" });
         fetchData();
-    };
+    }, [fetchData]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -78,24 +136,7 @@ export default function PurchasingPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {purchaseOrders.map(po => (
-                                <tr key={po.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-6 py-4 font-mono text-xs font-black text-indigo-600">{po.number}</td>
-                                    <td className="px-6 py-4 font-bold text-slate-700">{po.supplier_name}</td>
-                                    <td className="px-6 py-4 font-mono text-sm font-black">{Number(po.total).toLocaleString()} {po.currency}</td>
-                                    <td className="px-6 py-4">
-                                        <StatusBadge status={po.status} />
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {po.status === "DRAFT" && (
-                                            <button
-                                                onClick={() => approvePO(po.id)}
-                                                className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors"
-                                            >
-                                                <Check size={12} className="inline mr-1" /> Approve
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
+                                <PurchaseOrderRow key={po.id} po={po} onApprove={approvePO} />
                             ))}
                             {purchaseOrders.length === 0 && (
                                 <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold">No purchase orders yet</td></tr>
@@ -110,28 +151,3 @@ export default function PurchasingPage() {
     );
 }
 
-function StatCard({ label, value, icon, color }: any) {
-    return (
-        <div className={`${color} text-white p-6 rounded-2xl flex items-center justify-between shadow-lg`}>
-            <div>
-                <p className="text-[10px] font-black opacity-70 uppercase tracking-widest">{label}</p>
-                <h4 className="text-2xl font-black">{value}</h4>
-            </div>
-            <div className="p-3 bg-white/10 rounded-xl">{icon}</div>
-        </div>
-    );
-}
-
-function StatusBadge({ status }: { status: string }) {
-    const colors: Record<string, string> = {
-        DRAFT: "bg-slate-100 text-slate-600",
-        APPROVED: "bg-emerald-100 text-emerald-600",
-        RECEIVED: "bg-blue-100 text-blue-600",
-        PAID: "bg-purple-100 text-purple-600"
-    };
-    return (
-        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${colors[status] || "bg-slate-100 text-slate-600"}`}>
-            {status}
-        </span>
-    );
-}

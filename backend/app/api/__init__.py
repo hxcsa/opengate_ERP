@@ -7,7 +7,7 @@ from app.core.auth import get_current_user
 from app.core.audit import get_audit_logger
 from app.schemas.erp import (
     AccountCreate, ItemCreate, JournalEntryCreate, 
-    GRNCreate, DeliveryNoteCreate
+    GRNCreate, DeliveryNoteCreate, EmployeeCreate
 )
 from app.services.inventory import InventoryService
 from app.services.accounting import AccountingService
@@ -227,8 +227,15 @@ async def get_fiscal_periods():
 # --- User & Employee Management ---
 @router.get("/users/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    """Get current user's profile and role."""
-    return user
+    """Get current user's profile and role from Firestore."""
+    db = get_db()
+    uid = user["uid"]
+    doc = db.collection("users").document(uid).get()
+    if doc.exists:
+        profile = doc.to_dict()
+        profile["uid"] = uid # Ensure UID is present
+        return profile
+    return user # Fallback to token claims
 
 @router.get("/users")
 async def list_employees(user: dict = Depends(get_current_user)):
@@ -238,15 +245,24 @@ async def list_employees(user: dict = Depends(get_current_user)):
 
 @router.post("/users")
 async def add_employee(
-    email: str, 
-    password: str, 
-    role: str, 
+    data: EmployeeCreate,
     user: dict = Depends(get_current_user)
 ):
     """Create a new employee (Admin only)."""
     service = get_users_service(user)
-    uid = service.create_employee(email, password, role)
+    uid = service.create_employee(data.email, data.password, data.role, data.allowed_tabs)
     return {"status": "created", "uid": uid}
+
+@router.put("/users/{user_id}/permissions")
+async def update_user_permissions(
+    user_id: str,
+    allowed_tabs: List[str],
+    user: dict = Depends(get_current_user)
+):
+    """Update granular tab permissions (Admin only)."""
+    service = get_users_service(user)
+    service.update_permissions(user_id, allowed_tabs)
+    return {"status": "updated"}
 
 @router.put("/users/{user_id}")
 async def update_user_role(
@@ -402,6 +418,58 @@ async def list_sales_orders(status: str = None, limit: int = 50):
     service = get_quotation_service()
     return service.list_sales_orders(status, limit)
 
+@router.get("/sales/invoice/{so_id}")
+async def download_sales_invoice(so_id: str):
+    """Generate and download sales invoice PDF."""
+    from app.services.pdf import PDFService
+    service = get_quotation_service()
+    
+    # Get Sales Order Data
+    try:
+        db = get_db()
+        d = db.collection("sales_orders").document(so_id).get()
+        if not d.exists:
+            raise HTTPException(status_code=404, detail="Order not found")
+        data = d.to_dict()
+        data['id'] = so_id
+        
+        pdf_service = PDFService()
+        pdf_bytes = pdf_service.generate_invoice(data, type="SALES INVOICE")
+        
+        from fastapi.responses import Response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=invoice_{so_id}.pdf"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/purchasing/invoice/{po_id}")
+async def download_purchase_invoice(po_id: str):
+    """Generate and download purchase order PDF."""
+    from app.services.pdf import PDFService
+    
+    try:
+        db = get_db()
+        d = db.collection("purchase_orders").document(po_id).get()
+        if not d.exists:
+            raise HTTPException(status_code=404, detail="Order not found")
+        data = d.to_dict()
+        data['id'] = po_id
+        
+        pdf_service = PDFService()
+        pdf_bytes = pdf_service.generate_invoice(data, type="PURCHASE ORDER")
+        
+        from fastapi.responses import Response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=po_{po_id}.pdf"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- Purchase Orders ---
 @router.get("/purchase-orders")
 async def list_purchase_orders(status: str = None, limit: int = 50):
@@ -452,3 +520,63 @@ async def record_depreciation(asset_id: str, period: str):
     amount = service.calculate_monthly_depreciation(asset_id)
     entry_id = service.record_depreciation(asset_id, amount, period)
     return {"status": "recorded", "amount": str(amount), "entry_id": entry_id}
+# --- Scheduling & Ecosystem ---
+
+@router.get("/scheduling/shifts")
+async def list_shifts(user: dict = Depends(get_current_user)):
+    """List all shifts for the company."""
+    db = get_db()
+    company_id = user.get("company_id")
+    
+    query = db.collection("shifts").where("company_id", "==", company_id)
+    
+    # Privacy: Non-admins only see their own shifts
+    if user.get("role") != "admin":
+        query = query.where("employee", "==", user.get("email"))
+        
+    docs = query.stream()
+    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+
+@router.post("/scheduling/shifts")
+async def create_shift(data: dict, user: dict = Depends(get_current_user)):
+    """Assign a shift (Admin only)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    db = get_db()
+    data["company_id"] = user.get("company_id")
+    data["created_at"] = firestore.SERVER_TIMESTAMP
+    doc_ref = db.collection("shifts").document()
+    doc_ref.set(data)
+    
+    # Return serializable data
+    response_data = {**data, "id": doc_ref.id}
+    if "created_at" in response_data:
+        del response_data["created_at"] # Avoid serialization error
+    return response_data
+
+@router.get("/scheduling/announcements")
+async def list_announcements(user: dict = Depends(get_current_user)):
+    """List all store announcements."""
+    db = get_db()
+    company_id = user.get("company_id")
+    # Note: Removed order_by to avoid requiring composite index
+    docs = db.collection("announcements").where("company_id", "==", company_id).limit(20).stream()
+    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+
+@router.post("/scheduling/announcements")
+async def create_announcement(data: dict, user: dict = Depends(get_current_user)):
+    """Post an announcement (Admin only)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    db = get_db()
+    data["company_id"] = user.get("company_id")
+    data["created_at"] = firestore.SERVER_TIMESTAMP
+    doc_ref = db.collection("announcements").document()
+    doc_ref.set(data)
+    
+    response_data = {**data, "id": doc_ref.id}
+    if "created_at" in response_data:
+        del response_data["created_at"]
+    return response_data

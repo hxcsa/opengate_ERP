@@ -30,11 +30,13 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  will-change: transform, box-shadow;
 }
 
 .enterprise-card:hover {
+  transform: translateY(-1px);
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
@@ -92,8 +94,8 @@ body {
 
 /* Modal and Form Styles */
 .modal-overlay {
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.7);
+  /* backdrop-filter removed for performance */
 }
 
 .form-input {

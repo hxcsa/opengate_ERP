@@ -27,8 +27,23 @@ backend/service_account.json
 .DS_Store
 Thumbs.db
 ~$*
+.idea/
+.vscode/
 
 # Agentic
 .gemini/
 .agent/
 brain/
+
+# Python extras
+.venv/
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log

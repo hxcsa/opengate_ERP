@@ -60,6 +60,22 @@ class PostingEngine:
         
         return True
 
+    def get_items_for_transaction(self, transaction, item_ids: list[str]) -> Dict[str, Dict[str, Any]]:
+        """Pre-fetches multiple items for a transaction to avoid Read-after-Write violations.
+        Call this at the VERY BEGINNING of your @firestore.transactional function.
+        """
+        if not item_ids:
+            return {}
+            
+        # Remove duplicates
+        unique_ids = list(set(item_ids))
+        refs = [self.db.collection("items").document(iid) for iid in unique_ids]
+        
+        # Firestore transactional get supports multiple refs
+        snapshots = self.db.get_all(refs, transaction=transaction)
+        
+        return {snap.id: snap.to_dict() or {} for snap in snapshots}
+
     def record_stock_movement(
         self,
         transaction,
@@ -73,10 +89,12 @@ class PostingEngine:
     ):
         """Records stock movement in Firestore transaction and updates WAC.
         IMPORTANT: This must be called from within a @firestore.transactional function.
+        To avoid Read-after-Write errors, pass item_data (pre-fetched via get_items_for_transaction).
         """
         item_ref = self.db.collection("items").document(item_id)
         
-        # If item_data is not provided, we must read it (Only works if no writes happened yet)
+        # If item_data is not provided, we try to read it. 
+        # CAUTION: This will FAIL if any writes have already occurred in this transaction!
         if item_data is None:
             snapshot = item_ref.get(transaction=transaction)
             item_data = snapshot.to_dict() or {}

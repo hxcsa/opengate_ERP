@@ -7,48 +7,88 @@ import {
     BarChart3, ArrowRight, History, Activity,
     FileDown, Box
 } from "lucide-react";
+import React, { useCallback, memo } from "react";
+
+const ReportLine = memo(({ label, icon, value, negative }: any) => (
+    <div className="flex justify-between items-center group">
+        <div className="flex items-center gap-2">
+            {icon}
+            <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+            <span className={`font-mono font-black tabular-nums ${negative ? 'text-rose-500' : 'text-slate-800'}`}>
+                {negative ? '-' : ''}{value}
+            </span>
+            <span className="text-[10px] font-black text-slate-300">IQD</span>
+        </div>
+    </div>
+));
+ReportLine.displayName = "ReportLine";
+
+const AuditRow = memo(({ log }: any) => (
+    <tr className="hover:bg-slate-50 transition-colors">
+        <td className="py-4 pr-4 font-mono text-[10px] text-slate-400">
+            {log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString() : 'N/A'}
+        </td>
+        <td className="py-4 px-4 text-center">
+            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${log.action === 'CREATE' ? 'bg-emerald-50 text-emerald-600' :
+                log.action === 'VOID' ? 'bg-rose-50 text-rose-600' :
+                    'bg-blue-50 text-blue-600'
+                }`}>
+                {log.action}
+            </span>
+        </td>
+        <td className="py-4 px-4 font-bold text-xs text-slate-600">{log.collection}</td>
+        <td className="py-4 px-4 text-xs font-medium text-slate-500">{log.user_id?.slice(0, 8)}...</td>
+        <td className="py-4 px-4 text-xs font-bold text-slate-800 truncate max-w-[200px]">
+            {log.doc_id}
+        </td>
+    </tr>
+));
+AuditRow.displayName = "AuditRow";
 
 export default function Reports() {
     const [reports, setReports] = useState<any>(null);
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                const [isRes, bsRes, valRes, auditRes] = await Promise.all([
-                    fetch("/api/reports/income-statement"),
-                    fetch("/api/reports/balance-sheet"),
-                    fetch("/api/reports/inventory-valuation"),
-                    fetch("/api/audit/logs")
-                ]);
+    const loadData = useCallback(async () => {
+        try {
+            const [isRes, bsRes, valRes, auditRes] = await Promise.all([
+                fetch("/api/reports/income-statement"),
+                fetch("/api/reports/balance-sheet"),
+                fetch("/api/reports/inventory-valuation"),
+                fetch("/api/audit/logs")
+            ]);
 
-                // Safe JSON parsing - check response.ok before parsing
-                const isData = isRes.ok ? await isRes.json() : { total_revenue: 0, total_expense: 0, net_income: 0 };
-                const bsData = bsRes.ok ? await bsRes.json() : { total_assets: 0, total_liabilities: 0, total_equity: 0 };
-                const valData = valRes.ok ? await valRes.json() : { total_inventory_value: 0 };
-                const auditData = auditRes.ok ? await auditRes.json() : [];
+            // Safe JSON parsing - check response.ok before parsing
+            const isData = isRes.ok ? await isRes.json() : { total_revenue: 0, total_expense: 0, net_income: 0 };
+            const bsData = bsRes.ok ? await bsRes.json() : { total_assets: 0, total_liabilities: 0, total_equity: 0 };
+            const valData = valRes.ok ? await valRes.json() : { total_inventory_value: 0 };
+            const auditData = auditRes.ok ? await auditRes.json() : [];
 
-                setReports({
-                    incomeStatement: isData,
-                    balanceSheet: bsData,
-                    valuation: Number(valData.total_inventory_value || 0).toLocaleString()
-                });
-                setAuditLogs(Array.isArray(auditData) ? auditData : []);
-            } catch (err) {
-                console.error("Reports fetch error:", err);
-                // Set defaults so page can still render
-                setReports({
-                    incomeStatement: { total_revenue: 0, total_expense: 0, net_income: 0 },
-                    balanceSheet: { total_assets: 0, total_liabilities: 0, total_equity: 0 },
-                    valuation: "0"
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
+            setReports({
+                incomeStatement: isData,
+                balanceSheet: bsData,
+                valuation: Number(valData.total_inventory_value || 0).toLocaleString()
+            });
+            setAuditLogs(Array.isArray(auditData) ? auditData : []);
+        } catch (err) {
+            console.error("Reports fetch error:", err);
+            // Set defaults so page can still render
+            setReports({
+                incomeStatement: { total_revenue: 0, total_expense: 0, net_income: 0 },
+                balanceSheet: { total_assets: 0, total_liabilities: 0, total_equity: 0 },
+                valuation: "0"
+            });
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     if (loading) return <div className="p-20 text-center font-bold text-slate-400">Loading Financial Statements...</div>;
 
@@ -192,24 +232,7 @@ export default function Reports() {
                             {auditLogs.length === 0 ? (
                                 <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-medium">No activity recorded</td></tr>
                             ) : auditLogs.map((log: any) => (
-                                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="py-4 pr-4 font-mono text-[10px] text-slate-400">
-                                        {log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString() : 'N/A'}
-                                    </td>
-                                    <td className="py-4 px-4 text-center">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${log.action === 'CREATE' ? 'bg-emerald-50 text-emerald-600' :
-                                            log.action === 'VOID' ? 'bg-rose-50 text-rose-600' :
-                                                'bg-blue-50 text-blue-600'
-                                            }`}>
-                                            {log.action}
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-4 font-bold text-xs text-slate-600">{log.collection}</td>
-                                    <td className="py-4 px-4 text-xs font-medium text-slate-500">{log.user_id?.slice(0, 8)}...</td>
-                                    <td className="py-4 px-4 text-xs font-bold text-slate-800 truncate max-w-[200px]">
-                                        {log.doc_id}
-                                    </td>
-                                </tr>
+                                <AuditRow key={log.id} log={log} />
                             ))}
                         </tbody>
                     </table>
@@ -219,19 +242,3 @@ export default function Reports() {
     );
 }
 
-function ReportLine({ label, icon, value, negative }: any) {
-    return (
-        <div className="flex justify-between items-center group">
-            <div className="flex items-center gap-2">
-                {icon}
-                <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{label}</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <span className={`font-mono font-black tabular-nums ${negative ? 'text-rose-500' : 'text-slate-800'}`}>
-                    {negative ? '-' : ''}{value}
-                </span>
-                <span className="text-[10px] font-black text-slate-300">IQD</span>
-            </div>
-        </div>
-    );
-}

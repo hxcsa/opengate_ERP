@@ -13,6 +13,65 @@ import ReconciliationForm from "@/components/ReconciliationForm";
 import InventoryAnalytics from "@/components/InventoryAnalytics";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+import React, { useCallback, memo } from "react";
+
+// Memoized Action Button
+const InventoryAction = memo(({ title, sub, icon, color, onClick }: any) => (
+    <button
+        onClick={onClick}
+        className={`${color} text-white p-6 rounded-2xl flex items-center justify-between group hover:scale-[1.02] transition-all shadow-lg hover:shadow-xl active:scale-95`}
+    >
+        <div className="text-left">
+            <h4 className="text-lg font-black leading-tight">{title}</h4>
+            <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{sub}</p>
+        </div>
+        <div className="p-3 bg-white/10 rounded-xl group-hover:bg-white/20 transition-all">
+            {icon}
+        </div>
+    </button>
+));
+
+InventoryAction.displayName = "InventoryAction";
+
+// Memoized Table Row
+const InventoryRow = memo(({ item, onHistoryClick }: any) => (
+    <tr className="hover:bg-slate-50/50 transition-colors group">
+        <td className="px-6 py-4">
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => onHistoryClick(item)}
+                    className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 font-bold text-xs uppercase hover:bg-slate-800 hover:text-white transition-all active:scale-90"
+                    title="View Stock History"
+                >
+                    <History size={16} />
+                </button>
+                <div>
+                    <div className="font-black text-slate-800">{item.name}</div>
+                    <div className="text-[10px] font-bold text-slate-400 font-mono">{item.sku}</div>
+                </div>
+            </div>
+        </td>
+        <td className="px-6 py-4">
+            <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                {item.category || "General"}
+            </span>
+        </td>
+        <td className="px-6 py-4 text-right">
+            <div className="font-black text-slate-800 font-mono">{Number(item.current_qty).toFixed(0)}</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase">{item.unit}</div>
+        </td>
+        <td className="px-6 py-4 text-right">
+            <div className="font-bold text-slate-600 font-mono text-sm">{Number(item.current_wac).toLocaleString()}</div>
+        </td>
+        <td className="px-6 py-4 text-right">
+            <div className="font-black text-primary font-mono tabular-nums">{Number(item.total_value).toLocaleString()}</div>
+            <div className="text-[10px] font-bold text-slate-300 uppercase">IQD</div>
+        </td>
+    </tr>
+));
+
+InventoryRow.displayName = "InventoryRow";
+
 export default function Inventory() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,7 +83,7 @@ export default function Inventory() {
     const [historyItem, setHistoryItem] = useState<any>(null);
     const { t } = useLanguage();
 
-    const fetchItems = () => {
+    const fetchItems = useCallback(() => {
         setLoading(true);
         fetch("/api/inventory/items")
             .then((res) => res.json())
@@ -33,7 +92,7 @@ export default function Inventory() {
                 setLoading(false);
             })
             .catch(() => setLoading(false));
-    };
+    }, []);
 
     useEffect(() => {
         fetchItems();
@@ -112,39 +171,7 @@ export default function Inventory() {
                                     <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold">Fetching Warehouse Data...</td>
                                 </tr>
                             ) : items.map((item) => (
-                                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={() => setHistoryItem(item)}
-                                                className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 font-bold text-xs uppercase hover:bg-slate-800 hover:text-white transition-all"
-                                                title="View Stock History"
-                                            >
-                                                <History size={16} />
-                                            </button>
-                                            <div>
-                                                <div className="font-black text-slate-800">{item.name}</div>
-                                                <div className="text-[10px] font-bold text-slate-400 font-mono">{item.sku}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                            {item.category || "General"}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="font-black text-slate-800 font-mono">{Number(item.current_qty).toFixed(0)}</div>
-                                        <div className="text-[10px] font-bold text-slate-400 uppercase">{item.unit}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="font-bold text-slate-600 font-mono text-sm">{Number(item.current_wac).toLocaleString()}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="font-black text-primary font-mono tabular-nums">{Number(item.total_value).toLocaleString()}</div>
-                                        <div className="text-[10px] font-bold text-slate-300 uppercase">IQD</div>
-                                    </td>
-                                </tr>
+                                <InventoryRow key={item.id} item={item} onHistoryClick={setHistoryItem} />
                             ))}
                         </tbody>
                     </table>
@@ -235,19 +262,3 @@ function HistoryModal({ item, onClose }: any) {
     );
 }
 
-function InventoryAction({ title, sub, icon, color, onClick }: any) {
-    return (
-        <button
-            onClick={onClick}
-            className={`${color} text-white p-6 rounded-2xl flex items-center justify-between group hover:scale-[1.02] transition-all shadow-lg hover:shadow-xl`}
-        >
-            <div className="text-left">
-                <h4 className="text-lg font-black leading-tight">{title}</h4>
-                <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{sub}</p>
-            </div>
-            <div className="p-3 bg-white/10 rounded-xl group-hover:bg-white/20 transition-all">
-                {icon}
-            </div>
-        </button>
-    );
-}

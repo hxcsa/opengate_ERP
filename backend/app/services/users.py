@@ -18,7 +18,7 @@ class UsersService:
         docs = self.db.collection("users").where("company_id", "==", self.company_id).stream()
         return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
-    def create_employee(self, email: str, password: str, role: str) -> str:
+    def create_employee(self, email: str, password: str, role: str, allowed_tabs: List[str] = None) -> str:
         """Create a new Firebase auth user and Firestore profile."""
         if self.role != "admin":
             raise HTTPException(status_code=403, detail="Only admins can create users")
@@ -39,6 +39,7 @@ class UsersService:
                 "email": email,
                 "role": role,
                 "company_id": self.company_id,
+                "allowed_tabs": allowed_tabs or [],
                 "created_at": firestore.SERVER_TIMESTAMP,
                 "created_by": self.current_user["uid"]
             }
@@ -54,6 +55,13 @@ class UsersService:
             raise HTTPException(status_code=403, detail="Only admins can update roles")
             
         self.db.collection("users").document(user_id).update({"role": new_role})
+
+    def update_permissions(self, user_id: str, allowed_tabs: List[str]):
+        """Update granular tab permissions."""
+        if self.role != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can update permissions")
+            
+        self.db.collection("users").document(user_id).update({"allowed_tabs": allowed_tabs})
 
     def delete_user(self, user_id: str):
         """Delete user account. Admin only."""

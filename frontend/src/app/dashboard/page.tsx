@@ -11,6 +11,80 @@ import {
 import SaleForm from "@/components/SaleForm";
 import PurchaseForm from "@/components/PurchaseForm";
 import { auth } from "@/lib/firebase";
+import React, { useCallback, memo } from "react";
+
+const KpiCard = memo(({ title, value, icon, trend, trendUp, description }: any) => (
+    <div className="enterprise-card flex flex-col justify-between group">
+        <div className="flex justify-between items-start mb-4">
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all duration-300">
+                {icon}
+            </div>
+            {trend && (
+                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {trend}
+                </span>
+            )}
+        </div>
+        <div>
+            <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">{title}</p>
+            <h4 className="text-2xl font-black text-slate-800 tabular-nums">{value}</h4>
+            {description && <p className="text-[10px] text-slate-400 mt-2 font-medium">{description}</p>}
+        </div>
+    </div>
+));
+KpiCard.displayName = "KpiCard";
+
+const QuickButton = memo(({ label, icon, color, onClick }: any) => {
+    const colors: any = {
+        emerald: "hover:bg-emerald-600 text-emerald-400 hover:text-white border-emerald-500/20",
+        blue: "hover:bg-blue-600 text-blue-400 hover:text-white border-blue-500/20",
+        amber: "hover:bg-amber-600 text-amber-400 hover:text-white border-amber-500/20",
+    };
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full text-right p-4 rounded-xl border transition-all flex items-center justify-between font-bold text-sm ${colors[color]}`}
+        >
+            <span className="opacity-90">{label}</span>
+            <div className="p-1.5 bg-white/5 rounded-lg">{icon}</div>
+        </button>
+    );
+});
+QuickButton.displayName = "QuickButton";
+
+const JournalRow = memo(({ je }: any) => (
+    <tr>
+        <td className="font-mono text-xs font-bold text-blue-600">{je.number}</td>
+        <td className="max-w-[150px] truncate">{je.description || "Entry"}</td>
+        <td className="font-bold text-slate-800">
+            {Number(je.lines?.[0]?.debit || je.lines?.[0]?.credit || 0).toLocaleString()}
+        </td>
+        <td>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                {je.status}
+            </span>
+        </td>
+    </tr>
+));
+JournalRow.displayName = "JournalRow";
+
+const StockRow = memo(({ item }: any) => (
+    <tr>
+        <td className="font-mono text-[10px] text-slate-400">{item.sku}</td>
+        <td className="font-bold">{item.name}</td>
+        <td className="font-bold text-slate-700">{Number(item.current_qty).toLocaleString()} {item.unit}</td>
+        <td>
+            {Number(item.current_qty) < 10 ? (
+                <div className="flex items-center gap-1.5 text-amber-600 font-bold text-[10px]">
+                    <AlertTriangle size={12} /> RESTOCK
+                </div>
+            ) : (
+                <div className="text-emerald-600 font-bold text-[10px]">OK</div>
+            )}
+        </td>
+    </tr>
+));
+StockRow.displayName = "StockRow";
 
 export default function Dashboard() {
     const [stats, setStats] = useState({
@@ -28,7 +102,7 @@ export default function Dashboard() {
 
     const [loading, setLoading] = useState(true);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const [journalsRes, itemsRes, statsRes, trendRes] = await Promise.all([
@@ -53,12 +127,12 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     // CRITICAL: Call fetchData when component mounts!
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -181,18 +255,7 @@ export default function Dashboard() {
                             </thead>
                             <tbody>
                                 {journalEntries.length > 0 ? journalEntries.map((je: any) => (
-                                    <tr key={je.id}>
-                                        <td className="font-mono text-xs font-bold text-blue-600">{je.number}</td>
-                                        <td className="max-w-[150px] truncate">{je.description || "Entry"}</td>
-                                        <td className="font-bold text-slate-800">
-                                            {Number(je.lines?.[0]?.debit || je.lines?.[0]?.credit || 0).toLocaleString()}
-                                        </td>
-                                        <td>
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                                                {je.status}
-                                            </span>
-                                        </td>
-                                    </tr>
+                                    <JournalRow key={je.id} je={je} />
                                 )) : (
                                     <tr><td colSpan={4} className="text-center text-slate-400 py-12 text-sm font-medium">Looking for data...</td></tr>
                                 )}
@@ -218,20 +281,7 @@ export default function Dashboard() {
                             </thead>
                             <tbody>
                                 {items.length > 0 ? items.map((item: any) => (
-                                    <tr key={item.id}>
-                                        <td className="font-mono text-[10px] text-slate-400">{item.sku}</td>
-                                        <td className="font-bold">{item.name}</td>
-                                        <td className="font-bold text-slate-700">{Number(item.current_qty).toLocaleString()} {item.unit}</td>
-                                        <td>
-                                            {Number(item.current_qty) < 10 ? (
-                                                <div className="flex items-center gap-1.5 text-amber-600 font-bold text-[10px]">
-                                                    <AlertTriangle size={12} /> RESTOCK
-                                                </div>
-                                            ) : (
-                                                <div className="text-emerald-600 font-bold text-[10px]">OK</div>
-                                            )}
-                                        </td>
-                                    </tr>
+                                    <StockRow key={item.id} item={item} />
                                 )) : (
                                     <tr><td colSpan={4} className="text-center text-slate-400 py-12 text-sm font-medium">No items found</td></tr>
                                 )}
@@ -271,41 +321,3 @@ export default function Dashboard() {
     );
 }
 
-function KpiCard({ title, value, icon, trend, trendUp, description }: any) {
-    return (
-        <div className="enterprise-card flex flex-col justify-between group">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all duration-300">
-                    {icon}
-                </div>
-                {trend && (
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                        {trend}
-                    </span>
-                )}
-            </div>
-            <div>
-                <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">{title}</p>
-                <h4 className="text-2xl font-black text-slate-800 tabular-nums">{value}</h4>
-                {description && <p className="text-[10px] text-slate-400 mt-2 font-medium">{description}</p>}
-            </div>
-        </div>
-    );
-}
-
-function QuickButton({ label, icon, color, onClick }: any) {
-    const colors: any = {
-        emerald: "hover:bg-emerald-600 text-emerald-400 hover:text-white border-emerald-500/20",
-        blue: "hover:bg-blue-600 text-blue-400 hover:text-white border-blue-500/20",
-        amber: "hover:bg-amber-600 text-amber-400 hover:text-white border-amber-500/20",
-    };
-    return (
-        <button
-            onClick={onClick}
-            className={`w-full text-right p-4 rounded-xl border transition-all flex items-center justify-between font-bold text-sm ${colors[color]}`}
-        >
-            <span className="opacity-90">{label}</span>
-            <div className="p-1.5 bg-white/5 rounded-lg">{icon}</div>
-        </button>
-    );
-}

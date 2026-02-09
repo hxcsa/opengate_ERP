@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
-import { Users, UserPlus, Shield, Mail, Key, X } from "lucide-react";
+import { Users, UserPlus, Shield, Mail, Key, X, CheckSquare, Square, Save, Loader2 } from "lucide-react";
+
+const AVAILABLE_TABS = [
+    { id: "schedule", label: "Schedule / الجدول" },
+    { id: "inventory", label: "Inventory / المخزون" },
+    { id: "sales", label: "Sales / المبيعات" },
+    { id: "purchasing", label: "Purchasing / المشتريات" },
+    { id: "accounting", label: "Accounting / المحاسبة" },
+    { id: "assets", label: "Assets / الأصول" },
+    { id: "reports", label: "Reports / التقارير" },
+    { id: "activity", label: "Activity / النشاط" },
+];
 
 export default function UsersPage() {
     const [employees, setEmployees] = useState<any[]>([]);
@@ -10,7 +21,12 @@ export default function UsersPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState("accountant");
+    const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
     const [message, setMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Permission Management Modal State
+    const [editingUser, setEditingUser] = useState<any>(null);
 
     const fetchEmployees = async () => {
         const user = auth.currentUser;
@@ -30,26 +46,49 @@ export default function UsersPage() {
         fetchEmployees();
     }, []);
 
+    const toggleTab = (tabId: string) => {
+        setSelectedTabs(prev =>
+            prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]
+        );
+    };
+
     const handleAddEmployee = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage("");
+        setIsSubmitting(true);
         const user = auth.currentUser;
         if (!user) return;
 
-        const token = await user.getIdToken();
-        const res = await fetch(`/api/users?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&role=${role}`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${token}` }
-        });
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch("/api/users", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    role,
+                    allowed_tabs: selectedTabs
+                })
+            });
 
-        if (res.ok) {
-            setMessage("Employee added successfully!");
-            setEmail("");
-            setPassword("");
-            fetchEmployees();
-        } else {
-            const err = await res.json();
-            setMessage(`Error: ${err.detail}`);
+            if (res.ok) {
+                setMessage("Employee added successfully!");
+                setEmail("");
+                setPassword("");
+                setSelectedTabs([]);
+                fetchEmployees();
+            } else {
+                const err = await res.json();
+                setMessage(`Error: ${err.detail || "Failed to create account"}`);
+            }
+        } catch (e) {
+            setMessage("Error: Network or server error");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -62,6 +101,25 @@ export default function UsersPage() {
             headers: { "Authorization": `Bearer ${token}` }
         });
         fetchEmployees();
+    };
+
+    const handleUpdatePermissions = async (uid: string, tabs: string[]) => {
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/users/${uid}/permissions`, {
+            method: "PUT",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(tabs)
+        });
+
+        if (res.ok) {
+            setEditingUser(null);
+            fetchEmployees();
+        }
     };
 
     const handleDeleteUser = async (uid: string) => {
@@ -96,7 +154,7 @@ export default function UsersPage() {
                         <h2 className="font-bold text-slate-800">Add New Employee</h2>
                     </div>
 
-                    <form onSubmit={handleAddEmployee} className="space-y-4">
+                    <form onSubmit={handleAddEmployee} className="space-y-4 text-right">
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-black text-slate-400 px-1">Email</label>
                             <input
@@ -106,6 +164,7 @@ export default function UsersPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                 placeholder="employee@company.com"
+                                dir="ltr"
                             />
                         </div>
 
@@ -118,6 +177,7 @@ export default function UsersPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
                                 placeholder="Min 6 characters"
+                                dir="ltr"
                             />
                         </div>
 
@@ -135,6 +195,26 @@ export default function UsersPage() {
                             </select>
                         </div>
 
+                        <div className="pt-4 border-t border-slate-100">
+                            <p className="text-[10px] uppercase font-black text-slate-400 mb-4 tracking-widest">Granular Permissions / صلاحيات دقيقة</p>
+                            <div className="grid grid-cols-1 gap-2">
+                                {AVAILABLE_TABS.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => toggleTab(tab.id)}
+                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-bold ${selectedTabs.includes(tab.id)
+                                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                                                : "bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-200"
+                                            }`}
+                                    >
+                                        {selectedTabs.includes(tab.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                                        <span className="flex-1 text-right">{tab.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {message && (
                             <div className={`p-4 rounded-xl text-xs font-bold text-center ${message.startsWith('Error') ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                 {message}
@@ -143,22 +223,24 @@ export default function UsersPage() {
 
                         <button
                             type="submit"
-                            className="w-full py-4 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 mt-2"
+                            disabled={isSubmitting}
+                            className="w-full py-4 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10 mt-6 flex items-center justify-center gap-2"
                         >
+                            {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <UserPlus size={20} />}
                             Create Employee Account
                         </button>
                     </form>
                 </div>
 
                 {/* Employee List */}
-                <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden h-fit">
                     <table className="w-full text-right border-collapse">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-200">
                                 <th className="p-4 text-[10px] uppercase font-black text-slate-400">Employee</th>
                                 <th className="p-4 text-[10px] uppercase font-black text-slate-400">Role</th>
-                                <th className="p-4 text-[10px] uppercase font-black text-slate-400">Created At</th>
-                                <th className="p-4 text-[10px] uppercase font-black text-slate-400">Action</th>
+                                <th className="p-4 text-[10px] uppercase font-black text-slate-400">Permissions</th>
+                                <th className="p-4 text-[10px] uppercase font-black text-slate-400 text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -194,10 +276,27 @@ export default function UsersPage() {
                                             <option value="viewer">Viewer</option>
                                         </select>
                                     </td>
-                                    <td className="p-4 text-xs text-slate-500 font-medium">
-                                        {emp.created_at ? new Date(emp.created_at.seconds * 1000).toLocaleDateString() : 'N/A'}
-                                    </td>
                                     <td className="p-4">
+                                        <div className="flex flex-wrap gap-1 max-w-[200px] justify-end">
+                                            {emp.role === 'admin' ? (
+                                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-slate-800 text-white rounded uppercase">Full Access</span>
+                                            ) : (emp.allowed_tabs && emp.allowed_tabs.length > 0) ? emp.allowed_tabs.map((tab: string) => (
+                                                <span key={tab} className="text-[8px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded uppercase">
+                                                    {tab}
+                                                </span>
+                                            )) : <span className="text-[8px] font-black px-1.5 py-0.5 bg-slate-50 text-slate-400 rounded uppercase">Legacy</span>}
+                                            {emp.role !== 'admin' && (
+                                                <button
+                                                    onClick={() => setEditingUser(emp)}
+                                                    className="p-1 hover:bg-slate-100 rounded text-blue-600 transition-colors"
+                                                    title="Edit Permissions"
+                                                >
+                                                    <Shield size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center">
                                         <button
                                             onClick={() => handleDeleteUser(emp.id)}
                                             className="text-slate-300 hover:text-red-500 transition-colors p-2"
@@ -211,6 +310,61 @@ export default function UsersPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Permission Edit Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 transform animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-start mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
+                                    <Shield size={24} />
+                                </div>
+                                <div className="text-right">
+                                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Lock/Unlock Tabs</h3>
+                                    <p className="text-xs text-slate-400 font-medium">{editingUser.email}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                <X size={20} className="text-slate-400" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto px-1">
+                            {AVAILABLE_TABS.map(tab => {
+                                const isAllowed = (editingUser.allowed_tabs || []).includes(tab.id);
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => {
+                                            const current = editingUser.allowed_tabs || [];
+                                            const next = current.includes(tab.id)
+                                                ? current.filter((t: string) => t !== tab.id)
+                                                : [...current, tab.id];
+                                            setEditingUser({ ...editingUser, allowed_tabs: next });
+                                        }}
+                                        className={`flex items-center gap-3 p-4 rounded-2xl border transition-all font-bold ${isAllowed
+                                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/10"
+                                                : "bg-slate-50 border-slate-100 text-slate-400 hover:bg-white"
+                                            }`}
+                                    >
+                                        {isAllowed ? <CheckSquare size={18} /> : <Square size={18} />}
+                                        <span className="flex-1 text-right">{tab.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            onClick={() => handleUpdatePermissions(editingUser.id, editingUser.allowed_tabs || [])}
+                            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 mt-8 flex items-center justify-center gap-2"
+                        >
+                            <Save size={18} />
+                            Save Permissions / حفظ الصلاحيات
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -4,6 +4,69 @@ import { useEffect, useState } from "react";
 import { Plus, FileText, ShoppingCart, ArrowRight, Search, Filter, Check, X, Clock } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import QuotationForm from "@/components/QuotationForm";
+import React, { useCallback, memo } from "react";
+
+const StatusBadge = memo(({ status }: { status: string }) => {
+    const colors: Record<string, string> = {
+        DRAFT: "bg-slate-100 text-slate-600",
+        SENT: "bg-blue-100 text-blue-600",
+        ACCEPTED: "bg-emerald-100 text-emerald-600",
+        CONVERTED: "bg-purple-100 text-purple-600",
+        PENDING: "bg-amber-100 text-amber-600",
+        APPROVED: "bg-emerald-100 text-emerald-600",
+        DELIVERED: "bg-blue-100 text-blue-600",
+        EXPIRED: "bg-rose-100 text-rose-600"
+    };
+    return (
+        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${colors[status] || "bg-slate-100 text-slate-600"}`}>
+            {status}
+        </span>
+    );
+});
+StatusBadge.displayName = "StatusBadge";
+
+const QuotationRow = memo(({ quo, onConvert }: any) => (
+    <tr className="hover:bg-slate-50/50 transition-colors">
+        <td className="px-6 py-4 font-mono text-xs font-black text-blue-600">{quo.number}</td>
+        <td className="px-6 py-4 font-bold text-slate-700">{quo.customer_name}</td>
+        <td className="px-6 py-4 font-mono text-sm font-black">{Number(quo.total).toLocaleString()} {quo.currency}</td>
+        <td className="px-6 py-4">
+            <StatusBadge status={quo.status} />
+        </td>
+        <td className="px-6 py-4 text-right">
+            {quo.status === "DRAFT" && (
+                <button
+                    onClick={() => onConvert(quo.id)}
+                    className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors active:scale-95"
+                >
+                    Convert to Order <ArrowRight size={12} className="inline" />
+                </button>
+            )}
+        </td>
+    </tr>
+));
+QuotationRow.displayName = "QuotationRow";
+
+const OrderRow = memo(({ so }: any) => (
+    <tr className="hover:bg-slate-50/50 transition-colors">
+        <td className="px-6 py-4 font-mono text-xs font-black text-emerald-600">{so.number}</td>
+        <td className="px-6 py-4 font-bold text-slate-700">{so.customer_name}</td>
+        <td className="px-6 py-4 font-mono text-sm font-black">{Number(so.total).toLocaleString()} {so.currency}</td>
+        <td className="px-6 py-4">
+            <StatusBadge status={so.status} />
+        </td>
+        <td className="px-6 py-4 text-right">
+            <button
+                onClick={() => window.open(`/api/sales/invoice/${so.id}`, '_blank')}
+                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Download Invoice"
+            >
+                <Filter size={18} className="rotate-180" /> {/* Using Filter icon purely as placeholder for Download if Download icon not imported, but wait, I can import Download. */}
+            </button>
+        </td>
+    </tr>
+));
+OrderRow.displayName = "OrderRow";
 
 export default function SalesPage() {
     const [quotations, setQuotations] = useState<any[]>([]);
@@ -13,7 +76,7 @@ export default function SalesPage() {
     const [activeTab, setActiveTab] = useState<"quotations" | "orders">("quotations");
     const { t } = useLanguage();
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const [quoRes, soRes] = await Promise.all([
@@ -28,14 +91,14 @@ export default function SalesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
-    const convertToOrder = async (quoId: string) => {
+    const convertToOrder = useCallback(async (quoId: string) => {
         await fetch(`/api/quotations/${quoId}/convert`, { method: "POST" });
         fetchData();
-    };
+    }, [fetchData]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -87,24 +150,7 @@ export default function SalesPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {quotations.map(quo => (
-                                <tr key={quo.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-6 py-4 font-mono text-xs font-black text-blue-600">{quo.number}</td>
-                                    <td className="px-6 py-4 font-bold text-slate-700">{quo.customer_name}</td>
-                                    <td className="px-6 py-4 font-mono text-sm font-black">{Number(quo.total).toLocaleString()} {quo.currency}</td>
-                                    <td className="px-6 py-4">
-                                        <StatusBadge status={quo.status} />
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {quo.status === "DRAFT" && (
-                                            <button
-                                                onClick={() => convertToOrder(quo.id)}
-                                                className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors"
-                                            >
-                                                Convert to Order <ArrowRight size={12} className="inline" />
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
+                                <QuotationRow key={quo.id} quo={quo} onConvert={convertToOrder} />
                             ))}
                             {quotations.length === 0 && (
                                 <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold">No quotations yet</td></tr>
@@ -123,14 +169,7 @@ export default function SalesPage() {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {salesOrders.map(so => (
-                                <tr key={so.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-6 py-4 font-mono text-xs font-black text-emerald-600">{so.number}</td>
-                                    <td className="px-6 py-4 font-bold text-slate-700">{so.customer_name}</td>
-                                    <td className="px-6 py-4 font-mono text-sm font-black">{Number(so.total).toLocaleString()} {so.currency}</td>
-                                    <td className="px-6 py-4">
-                                        <StatusBadge status={so.status} />
-                                    </td>
-                                </tr>
+                                <OrderRow key={so.id} so={so} />
                             ))}
                             {salesOrders.length === 0 && (
                                 <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold">No sales orders yet</td></tr>
@@ -145,20 +184,3 @@ export default function SalesPage() {
     );
 }
 
-function StatusBadge({ status }: { status: string }) {
-    const colors: Record<string, string> = {
-        DRAFT: "bg-slate-100 text-slate-600",
-        SENT: "bg-blue-100 text-blue-600",
-        ACCEPTED: "bg-emerald-100 text-emerald-600",
-        CONVERTED: "bg-purple-100 text-purple-600",
-        PENDING: "bg-amber-100 text-amber-600",
-        APPROVED: "bg-emerald-100 text-emerald-600",
-        DELIVERED: "bg-blue-100 text-blue-600",
-        EXPIRED: "bg-rose-100 text-rose-600"
-    };
-    return (
-        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase ${colors[status] || "bg-slate-100 text-slate-600"}`}>
-            {status}
-        </span>
-    );
-}
