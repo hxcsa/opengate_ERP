@@ -94,7 +94,7 @@ export default function ProductsTab() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-xs font-bold text-slate-500">
-                                            {customers.find(c => c.id === product.customer_id)?.company_name || "General"}
+                                            {customers.find((c: any) => c.id === product.customer_id)?.company_name || "General"}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500">{product.sku}</td>

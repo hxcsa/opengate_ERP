@@ -100,7 +100,7 @@ export default function ReceiptsPage() {
     const assetAccounts = accounts.filter((a) => a.type === "ASSET");
 
     const customerName = (id: string) => {
-        const c = customers.find((cust) => cust.id === id);
+        const c = customers.find((cust: any) => cust.id === id);
         if (!c) return id;
         return `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.company || id;
     };

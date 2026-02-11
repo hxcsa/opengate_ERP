@@ -124,7 +124,7 @@ export default function PaymentVouchersPage() {
             return;
         }
 
-        const firstLine = formData.lines.find((l) => parseFloat(l.amount) > 0);
+        const firstLine = formData.lines.find((l: any) => parseFloat(l.amount) > 0);
         if (!firstLine?.account_id) {
             alert("Please select an expense account for at least one line.");
             return;
@@ -320,10 +320,10 @@ export default function PaymentVouchersPage() {
                                                     const val = e.target.value;
                                                     if (!val) return;
                                                     if (val.startsWith("cust:")) {
-                                                        const c = customers.find(x => x.id === val.split(":")[1]);
+                                                        const c = customers.find((x: any) => x.id === val.split(":")[1]);
                                                         if (c) setFormData({ ...formData, payee: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.company || c.id });
                                                     } else if (val.startsWith("supp:")) {
-                                                        const s = suppliers.find(x => x.id === val.split(":")[1]);
+                                                        const s = suppliers.find((x: any) => x.id === val.split(":")[1]);
                                                         if (s) setFormData({ ...formData, payee: s.name || s.company || s.id });
                                                     }
                                                 }}
@@ -354,7 +354,7 @@ export default function PaymentVouchersPage() {
                                                 const val = e.target.value;
                                                 if (!val) return;
                                                 if (val.startsWith("cust:")) {
-                                                    const c = customers.find(x => x.id === val.split(":")[1]);
+                                                    const c = customers.find((x: any) => x.id === val.split(":")[1]);
                                                     if (c) setFormData({ ...formData, receiver: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.company || c.id });
                                                 } else if (val.startsWith("supp:")) {
                                                     const s = suppliers.find(x => x.id === val.split(":")[1]);

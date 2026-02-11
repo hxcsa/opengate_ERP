@@ -99,7 +99,7 @@ export default function SaleForm({ onClose, onSuccess }: SaleFormProps) {
     };
 
     const getStock = (itemId: string) => {
-        const item = items.find(i => i.id === itemId);
+        const item = items.find((i: any) => i.id === itemId);
         return item ? Number(item.current_qty) : 0;
     };
 

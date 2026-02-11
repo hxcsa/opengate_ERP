@@ -202,7 +202,7 @@ export default function SchedulePage() {
                                     className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                                     value={form.employee}
                                     onChange={e => {
-                                        const u = users.find(u => u.email === e.target.value);
+                                        const u = users.find((u: any) => u.email === e.target.value);
                                         setForm({ ...form, employee: e.target.value, role: u?.role || "" });
                                     }}
                                 >

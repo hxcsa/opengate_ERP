@@ -43,7 +43,7 @@ export default function PurchaseOrderForm({ onClose, onSuccess }: PurchaseOrderF
         const newLines = [...formData.lines];
         (newLines[index] as any)[field] = value;
         if (field === "item_id") {
-            const item = items.find(i => i.id === value);
+            const item = items.find((i: any) => i.id === value);
             if (item) newLines[index].item_name = item.name;
         }
         setFormData({ ...formData, lines: newLines });

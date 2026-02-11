@@ -147,7 +147,7 @@ export default function IntentList() {
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {intents.map((intent) => {
-                        const client = customers.find(c => c.id === intent.client_id);
+                        const client = customers.find((c: any) => c.id === intent.client_id);
                         return (
                             <div key={intent.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-primary/30 transition-all hover:shadow-xl group relative overflow-hidden">
                                 {/* Type strip */}

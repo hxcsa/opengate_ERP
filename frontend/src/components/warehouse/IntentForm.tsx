@@ -65,7 +65,7 @@ export default function IntentForm({ onClose, onSuccess, customers }: IntentForm
 
     const handleAddItem = () => {
         if (!selectedItem) return;
-        const product = products.find(p => p.id === selectedItem);
+        const product = products.find((p: any) => p.id === selectedItem);
         const newItem = {
             item_id: selectedItem,
             name: product?.name || "Unknown",
@@ -146,7 +146,7 @@ export default function IntentForm({ onClose, onSuccess, customers }: IntentForm
     const handleNext = () => {
         if (step === 3 && selectedItem) {
             // Auto-add item if user tries to proceed without clicking "Add"
-            const product = products.find(p => p.id === selectedItem);
+            const product = products.find((p: any) => p.id === selectedItem);
             const newItem = {
                 item_id: selectedItem,
                 name: product?.name || "Unknown",
@@ -409,7 +409,7 @@ export default function IntentForm({ onClose, onSuccess, customers }: IntentForm
                                     <div className="flex justify-between font-bold">
                                         <span className="text-slate-500">Client</span>
                                         <span className="text-slate-800">
-                                            {customers.find(c => c.id === formData.client_id)?.company_name || 'Not Selected'}
+                                            {customers.find((c: any) => c.id === formData.client_id)?.company_name || 'Not Selected'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between font-bold">

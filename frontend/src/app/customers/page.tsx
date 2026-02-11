@@ -138,7 +138,7 @@ export default function CustomersPage() {
                         <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
                             <div>
                                 <h3 className="text-xl font-black tracking-tight">Customer Inventory / مخزون العميل</h3>
-                                <p className="text-slate-400 text-sm font-medium">{customers.find(c => c.id === viewingItemsId)?.company_name}</p>
+                                <p className="text-slate-400 text-sm font-medium">{customers.find((c: any) => c.id === viewingItemsId)?.company_name}</p>
                             </div>
                             <button onClick={() => setViewingItemsId(null)} className="p-3 hover:bg-white/10 rounded-full transition-colors"><X size={24} /></button>
                         </div>

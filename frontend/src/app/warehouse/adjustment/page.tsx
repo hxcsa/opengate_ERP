@@ -87,11 +87,11 @@ export default function AdjustmentPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-slate-50 p-3 rounded-xl">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Warehouse</p>
-                                        <p className="text-xs font-bold text-slate-700">{warehouses.find(w => w.id === adj.warehouse_id)?.name || "N/A"}</p>
+                                        <p className="text-xs font-bold text-slate-700">{warehouses.find((w: any) => w.id === adj.warehouse_id)?.name || "N/A"}</p>
                                     </div>
                                     <div className="bg-slate-50 p-3 rounded-xl">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer</p>
-                                        <p className="text-xs font-bold text-slate-700 truncate">{customers.find(c => c.id === adj.customer_id)?.company_name || "N/A"}</p>
+                                        <p className="text-xs font-bold text-slate-700 truncate">{customers.find((c: any) => c.id === adj.customer_id)?.company_name || "N/A"}</p>
                                     </div>
                                 </div>
                                 {adj.notes && (

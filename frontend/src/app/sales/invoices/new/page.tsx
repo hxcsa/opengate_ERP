@@ -320,7 +320,7 @@ export default function NewInvoicePage() {
                         <select
                             value={form.warehouse_id}
                             onChange={(e) => {
-                                const wh = warehouses.find(w => w.id === e.target.value);
+                                const wh = warehouses.find((w: any) => w.id === e.target.value);
                                 setForm(f => ({ ...f, warehouse_id: e.target.value, warehouse_name: wh?.name || "" }));
                             }}
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"

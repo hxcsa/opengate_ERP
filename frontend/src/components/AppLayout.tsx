@@ -181,8 +181,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // Auto-expand menu if sub-item is active
     useEffect(() => {
-        const activeItem = ALL_ITEMS.find(item =>
-            item.subItems?.some(sub => sub.href === pathname)
+        const activeItem = ALL_ITEMS.find((item: any) =>
+            item.subItems?.some((sub: any) => sub.href === pathname)
         );
         if (activeItem && !expandedMenus.includes(activeItem.label)) {
             setExpandedMenus(prev => [...prev, activeItem.label]);
@@ -325,7 +325,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             <Menu size={24} />
                         </button>
                         <h2 className="text-lg font-bold text-slate-800 truncate max-w-[150px] sm:max-w-none">
-                            {ALL_ITEMS.find((m) => m.href === pathname)?.label || t("system")}
+                            {ALL_ITEMS.find((m: any) => m.href === pathname)?.label || t("system")}
                         </h2>
                     </div>
 

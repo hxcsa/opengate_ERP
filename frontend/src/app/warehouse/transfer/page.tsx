@@ -85,18 +85,18 @@ export default function TransferPage() {
                                 <div className="flex items-center gap-4 py-3 border-y border-slate-50">
                                     <div className="flex-1">
                                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">From</p>
-                                        <p className="font-bold text-slate-700 text-sm truncate">{warehouses.find(w => w.id === t.from_warehouse_id)?.name || "Unknown"}</p>
+                                        <p className="font-bold text-slate-700 text-sm truncate">{warehouses.find((w: any) => w.id === t.from_warehouse_id)?.name || "Unknown"}</p>
                                     </div>
                                     <ArrowRightLeft className="text-slate-200" size={16} />
                                     <div className="flex-1 text-right">
                                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">To</p>
-                                        <p className="font-bold text-slate-700 text-sm truncate">{warehouses.find(w => w.id === t.to_warehouse_id)?.name || "Unknown"}</p>
+                                        <p className="font-bold text-slate-700 text-sm truncate">{warehouses.find((w: any) => w.id === t.to_warehouse_id)?.name || "Unknown"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <User size={14} className="text-slate-400" />
-                                        <span className="text-xs font-bold text-slate-500">{customers.find(c => c.id === t.customer_id)?.company_name || "Unknown"}</span>
+                                        <span className="text-xs font-bold text-slate-500">{customers.find((c: any) => c.id === t.customer_id)?.company_name || "Unknown"}</span>
                                     </div>
                                     <span className="text-xs font-black text-primary">{t.items?.length || 0} items</span>
                                 </div>
@@ -306,7 +306,7 @@ function TransferForm({ onClose, onSuccess, warehouses, customers, products }: a
                                 {itemInput.item_id && (
                                     <div className="mt-1 px-1 flex justify-between items-center">
                                         <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find(w => w.id === formData.from_warehouse_id)?.name || 'Global'}`}
+                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find((w: any) => w.id === formData.from_warehouse_id)?.name || 'Global'}`}
                                         </p>
                                         {currentStock !== null && parseFloat(itemInput.quantity) > currentStock && (
                                             <p className="text-[9px] font-bold text-rose-500 animate-pulse">Insufficient Stock! / نقص في المخزون</p>

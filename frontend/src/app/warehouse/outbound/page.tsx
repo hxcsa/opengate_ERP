@@ -251,7 +251,7 @@ function OutboundForm({ onClose, onSuccess, warehouses, customers, products, acc
                                 {lineInput.item_id && (
                                     <div className="mt-1 px-1">
                                         <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find(w => w.id === lineInput.warehouse_id)?.name || 'Global'}`}
+                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find((w: any) => w.id === lineInput.warehouse_id)?.name || 'Global'}`}
                                         </p>
                                     </div>
                                 )}
