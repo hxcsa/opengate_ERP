@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Save, Plus, Trash2, ShoppingCart, User, Package, Building2, TrendingDown } from "lucide-react";
 import SuccessModal from "./SuccessModal";
+import { fetchWithAuth } from "@/lib/api";
 
 interface SaleFormProps {
     onClose: () => void;
@@ -23,30 +24,29 @@ export default function SaleForm({ onClose, onSuccess }: SaleFormProps) {
 
     useEffect(() => {
         // Fetch Items
-        fetch("/api/inventory/items").then(res => res.json()).then(data => {
-            if (Array.isArray(data)) setItems(data);
+        fetchWithAuth("/api/inventory/items").then(res => res.json()).then(data => {
+            const list = data.items || (Array.isArray(data) ? data : []);
+            setItems(list);
         });
 
         // Fetch Accounts (Filter for Customers/Receivables)
-        fetch("/api/accounts?limit=200").then(res => res.json()).then(data => {
-            if (Array.isArray(data)) {
-                // Heuristic: Accounts starting with '122' (Receivables) and not groups
-                const custs = data.filter(acc => acc.code.startsWith('122') && !acc.is_group);
-                setCustomers(custs);
-            }
+        fetchWithAuth("/api/accounts?limit=200").then(res => res.json()).then(data => {
+            const list = data.accounts || (Array.isArray(data) ? data : []);
+            // Heuristic: Accounts starting with '122' (Receivables) and not groups
+            const custs = list.filter((acc: any) => acc.code.startsWith('122') && !acc.is_group);
+            setCustomers(custs);
         });
 
         // Fetch Warehouses
-        fetch("/api/warehouses").then(res => res.json()).then(data => {
-            if (Array.isArray(data)) {
-                setWarehouses(data);
-                // Set default warehouse if available
-                if (data.length > 0) {
-                    setFormData(prev => ({
-                        ...prev,
-                        lines: prev.lines.map(l => ({ ...l, warehouse_id: data[0].id }))
-                    }));
-                }
+        fetchWithAuth("/api/warehouses").then(res => res.json()).then(data => {
+            const list = data.warehouses || (Array.isArray(data) ? data : []);
+            setWarehouses(list);
+            // Set default warehouse if available
+            if (list.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    lines: prev.lines.map(l => ({ ...l, warehouse_id: list[0].id }))
+                }));
             }
         });
     }, []);
@@ -74,9 +74,8 @@ export default function SaleForm({ onClose, onSuccess }: SaleFormProps) {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch("/api/inventory/delivery-note", {
+            const res = await fetchWithAuth("/api/inventory/delivery-note", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
             });
             if (res.ok) {

@@ -5,6 +5,7 @@ import { Plus, Truck, Check, Clock, FileText, Search } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import PurchaseOrderForm from "@/components/PurchaseOrderForm";
 import React, { useCallback, memo } from "react";
+import { fetchWithAuth } from "@/lib/api";
 
 const StatusBadge = memo(({ status }: { status: string }) => {
     const colors: Record<string, string> = {
@@ -72,7 +73,7 @@ export default function PurchasingPage() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/purchase-orders");
+            const res = await fetchWithAuth("/api/purchase-orders");
             const data = await res.json();
             if (Array.isArray(data)) setPurchaseOrders(data);
         } catch (e) {
@@ -85,7 +86,7 @@ export default function PurchasingPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const approvePO = useCallback(async (poId: string) => {
-        await fetch(`/api/purchase-orders/${poId}/approve`, { method: "POST" });
+        await fetchWithAuth(`/api/purchase-orders/${poId}/approve`, { method: "POST" });
         fetchData();
     }, [fetchData]);
 

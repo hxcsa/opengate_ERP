@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, memo } from "react";
 import { Plus, Building2, DollarSign, TrendingDown, Calendar, AlertCircle, Check } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { fetchWithAuth } from "@/lib/api";
 
 const SummaryCard = memo(({ label, value, icon, color }: any) => (
     <div className={`${color} text-white p-6 rounded-2xl flex items-center justify-between shadow-lg`}>
@@ -51,9 +52,8 @@ const AssetForm = memo(({ onClose, onSuccess }: { onClose: () => void; onSuccess
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch("/api/assets", {
+            const res = await fetchWithAuth("/api/assets", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...formData,
                     purchase_value: Number(formData.purchase_value),
@@ -141,8 +141,8 @@ export default function AssetsPage() {
         setLoading(true);
         try {
             const [assetsRes, summaryRes] = await Promise.all([
-                fetch("/api/assets"),
-                fetch("/api/assets/summary")
+                fetchWithAuth("/api/assets"),
+                fetchWithAuth("/api/assets/summary")
             ]);
             const [assetsData, summaryData] = await Promise.all([assetsRes.json(), summaryRes.json()]);
             if (Array.isArray(assetsData)) setAssets(assetsData);
@@ -158,7 +158,7 @@ export default function AssetsPage() {
 
     const runDepreciation = useCallback(async (assetId: string) => {
         const period = new Date().toISOString().slice(0, 7); // e.g., "2026-02"
-        await fetch(`/api/assets/${assetId}/depreciate?period=${period}`, { method: "POST" });
+        await fetchWithAuth(`/api/assets/${assetId}/depreciate?period=${period}`, { method: "POST" });
         fetchData();
     }, [fetchData]);
 

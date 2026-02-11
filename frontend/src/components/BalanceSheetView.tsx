@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Landmark, ShieldCheck, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { fetchWithAuth } from "@/lib/api";
 
 interface BalanceSheetViewProps {
     onClose: () => void;
@@ -14,7 +15,7 @@ export default function BalanceSheetView({ onClose }: BalanceSheetViewProps) {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch("/api/reports/balance-sheet")
+        fetchWithAuth("/api/reports/balance-sheet")
             .then(res => res.json())
             .then(d => {
                 setStats(d);
@@ -27,15 +28,36 @@ export default function BalanceSheetView({ onClose }: BalanceSheetViewProps) {
     const liabilities = Number(stats?.total_liabilities || 0);
     const equity = Number(stats?.total_equity || 0);
     const isBalanced = stats?.balanced ?? true;
+    const { locale } = useLanguage();
+
+    const Section = ({ title, items, total, color }: any) => (
+        <section className="space-y-4">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 pb-2">{title}</h4>
+            <div className="space-y-2">
+                {items?.map((item: any) => (
+                    <div key={item.code} className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500 font-medium">
+                            {item.code} - {locale === 'ar' ? item.name_ar : item.name_en}
+                        </span>
+                        <span className="font-bold tabular-nums text-slate-700">{Number(item.balance).toLocaleString()}</span>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-between items-center text-sm font-bold text-slate-800 pt-2">
+                <span>Total</span>
+                <span className={`font-black tabular-nums ${color}`}>{total.toLocaleString()} IQD</span>
+            </div>
+        </section>
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col animate-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col animate-in zoom-in duration-200 overflow-hidden">
                 <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-3">
                         <Landmark size={20} />
                         <div>
-                            <h3 className="text-lg font-bold">Balance Sheet / الميزانية العمومية</h3>
+                            <h3 className="text-lg font-bold">{locale === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</h3>
                             <p className="text-[10px] opacity-70 font-bold uppercase tracking-widest">Statement of Financial Position</p>
                         </div>
                     </div>
@@ -54,29 +76,24 @@ export default function BalanceSheetView({ onClose }: BalanceSheetViewProps) {
                                 </div>
                             </div>
 
-                            <section className="space-y-4">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 pb-2">Assets / الأصول</h4>
-                                <div className="flex justify-between items-center text-sm font-bold text-slate-700">
-                                    <span>Total Assets</span>
-                                    <span className="font-black tabular-nums">{assets.toLocaleString()} IQD</span>
-                                </div>
-                            </section>
-
-                            <section className="space-y-4">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 pb-2">Liabilities / الخصوم</h4>
-                                <div className="flex justify-between items-center text-sm font-bold text-slate-700">
-                                    <span>Total Liabilities</span>
-                                    <span className="font-black tabular-nums text-rose-600">{liabilities.toLocaleString()} IQD</span>
-                                </div>
-                            </section>
-
-                            <section className="space-y-4">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 pb-2">Equity / حقوق الملكية</h4>
-                                <div className="flex justify-between items-center text-sm font-bold text-slate-700">
-                                    <span>Total Equity</span>
-                                    <span className="font-black tabular-nums text-blue-600">{equity.toLocaleString()} IQD</span>
-                                </div>
-                            </section>
+                            <Section
+                                title={locale === 'ar' ? "الأصول" : "Assets"}
+                                items={stats.assets}
+                                total={assets}
+                                color="text-emerald-600"
+                            />
+                            <Section
+                                title={locale === 'ar' ? "الخصوم" : "Liabilities"}
+                                items={stats.liabilities}
+                                total={liabilities}
+                                color="text-rose-600"
+                            />
+                            <Section
+                                title={locale === 'ar' ? "حقوق الملكية" : "Equity"}
+                                items={stats.equity}
+                                total={equity}
+                                color="text-blue-600"
+                            />
 
                             <div className="pt-8 mt-8 border-t border-slate-200">
                                 <div className="flex justify-between items-end p-6 bg-slate-900 rounded-2xl text-white shadow-xl shadow-slate-900/20">

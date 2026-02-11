@@ -96,7 +96,11 @@ class IntegrationService:
             "lines": lines_data
         })
         
-        self.posting_engine.post_journal_entry(transaction, je_id)
+        # Pre-fetch accounts
+        account_ids = list(set(line["account_id"] for line in lines_data))
+        accounts_data = self.posting_engine.get_accounts_for_transaction(transaction, account_ids)
+        
+        self.posting_engine.post_journal_entry(transaction, je_id, lines_data, accounts_data)
         return je_id
 
     async def create_purchase_return(self, data: ReturnCreate):
@@ -152,7 +156,11 @@ class IntegrationService:
             "lines": lines_data
         })
         
-        self.posting_engine.post_journal_entry(transaction, je_id)
+        # Pre-fetch accounts
+        account_ids = list(set(line["account_id"] for line in lines_data))
+        accounts_data = self.posting_engine.get_accounts_for_transaction(transaction, account_ids)
+
+        self.posting_engine.post_journal_entry(transaction, je_id, lines_data, accounts_data)
         return je_id
 
     async def create_stock_transfer(self, data: TransferCreate):

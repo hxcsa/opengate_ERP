@@ -22,24 +22,53 @@ import {
     Globe,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     Menu,
     X,
-    CalendarClock
+    CalendarClock,
+    Users,
+    UserCog,
+    RefreshCw
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const ALL_ITEMS = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "accountant", "storekeeper", "viewer"] },
     { label: "Schedule / الجدول", href: "/schedule", icon: CalendarClock, roles: ["admin", "accountant", "storekeeper", "viewer"] },
+    { label: "Invoices / الفواتير", href: "/invoices", icon: FileText, roles: ["admin", "accountant"] },
+    { label: "Customers / الزبائن", href: "/customers", icon: Users, roles: ["admin", "accountant"] },
     { label: "Inventory", href: "/inventory", icon: Box, roles: ["admin", "accountant", "storekeeper"] },
-    { label: "Sales / المبيعات", href: "/sales", icon: FileText, roles: ["admin", "accountant"] },
+    { label: "Sales / المبيعات", href: "/sales", icon: FileBarChart, roles: ["admin", "accountant"] },
+
     { label: "Purchasing / المشتريات", href: "/purchasing", icon: Truck, roles: ["admin", "accountant", "storekeeper"] },
-    { label: "Accounting", href: "/accounting", icon: CircleDollarSign, roles: ["admin", "accountant"] },
+    {
+        label: "Accounting",
+        href: "/accounting",
+        icon: CircleDollarSign,
+        roles: ["admin", "accountant"],
+        subItems: [
+            { label: "Overview", href: "/accounting" },
+            { label: "Categories / التصنيفات", href: "/accounting?tab=categories" },
+            { label: "Payment Vouchers / سندات الصرف", href: "/accounting?tab=payments" },
+            { label: "Receipts / سندات القبض", href: "/accounting?tab=receipts" },
+            { label: "Chart of Accounts", href: "/accounting/chart-of-accounts" },
+            { label: "Expenses", href: "/accounting/expenses" },
+            { label: "Credit Notes", href: "/sales/credit-notes" },
+            { label: "Journal Entries", href: "/accounting/journals" },
+            { label: "General Ledger", href: "/accounting/general-ledger" },
+            { label: "Statements", href: "/accounting/statements" },
+            { label: "Trial Balance", href: "/accounting/trial-balance" },
+        ]
+    },
     { label: "Assets / الأصول", href: "/assets", icon: Building2, roles: ["admin", "accountant"] },
-    { label: "Reports", href: "/reports", icon: FileBarChart, roles: ["admin", "accountant"] },
+    { label: "Reports", href: "/reports", icon: Globe, roles: ["admin", "accountant"] },
     { label: "Activity", href: "/activity", icon: Activity, roles: ["admin", "accountant", "storekeeper"] },
-    { label: "Employees", href: "/users", icon: Settings, roles: ["admin"] },
+    { label: "Employees / الموظفين", href: "/employees", icon: UserCog, roles: ["admin"] },
 ];
+
+import { useRef } from "react";
+
+// ... existing imports
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -48,34 +77,54 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [role, setRole] = useState<string>("viewer");
     const [allowedTabs, setAllowedTabs] = useState<string[] | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [timeLeft, setTimeLeft] = useState<number>(45 * 60); // 45 minutes in seconds
     const { t, locale, toggleLanguage } = useLanguage();
 
-    // 🔐 Security: 45-minute Inactivity Logout
+    // Timer ref to access current value in event handlers without re-binding
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const lastActivityRef = useRef<number>(Date.now());
+
+    // 🔐 Security: Visible 45-minute Manual Timer
     useEffect(() => {
-        let timeout: NodeJS.Timeout;
+        console.log("Timer Effect Mounted");
 
-        const resetTimer = () => {
-            if (timeout) clearTimeout(timeout);
-            // 45 minutes = 45 * 60 * 1000 ms
-            timeout = setTimeout(() => {
-                if (auth.currentUser) {
-                    console.log("Session expired due to inactivity.");
-                    signOut(auth);
+        // Update countdown every second
+        const intervalId = setInterval(() => {
+            setTimeLeft((prev) => {
+                const newValue = prev - 1;
+                // console.log("Tick:", newValue); 
+
+                if (newValue <= 0) {
+                    if (auth.currentUser) {
+                        console.log("Session expired.");
+                        signOut(auth);
+                    }
+                    clearInterval(intervalId);
+                    return 0;
                 }
-            }, 45 * 60 * 1000);
-        };
-
-        const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
-        events.forEach((name) => document.addEventListener(name, resetTimer));
-
-        resetTimer(); // Initialize
+                return newValue;
+            });
+        }, 1000);
 
         return () => {
-            if (timeout) clearTimeout(timeout);
-            events.forEach((name) => document.removeEventListener(name, resetTimer));
-        };
+            console.log("Timer Effect Unmounted");
+            clearInterval(intervalId);
+        }
     }, []);
 
+    const extendSession = () => {
+        console.log("Session Extended");
+        setTimeLeft(45 * 60);
+        // Optional: Add a visual feedback toast here if desired
+    };
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    // ... existing auth effect ...
     useEffect(() => {
         return onAuthStateChanged(auth, async (u) => {
             if (!u && pathname !== "/login") {
@@ -108,6 +157,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         });
     }, [router, pathname]);
 
+    const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+
+    // ... existing menu logic ...
+
+    // Auto-expand menu if sub-item is active
+    useEffect(() => {
+        const activeItem = ALL_ITEMS.find(item =>
+            item.subItems?.some(sub => sub.href === pathname)
+        );
+        if (activeItem && !expandedMenus.includes(activeItem.label)) {
+            setExpandedMenus(prev => [...prev, activeItem.label]);
+        }
+    }, [pathname]);
+
     if (pathname === "/login") return <>{children}</>;
 
 
@@ -128,6 +191,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         return hasRoleAccess;
     });
+
+    const toggleMenu = (label: string) => {
+        setExpandedMenus(prev =>
+            prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+        );
+    };
 
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -153,18 +222,50 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
                     <p className="text-[10px] uppercase font-bold text-slate-500 px-4 mb-2 tracking-widest">{t("mainMenu")}</p>
-                    {menuItems.map((item) => {
+                    {menuItems.map((item: any) => {
                         const Icon = item.icon;
+                        const isExpanded = expandedMenus.includes(item.label);
+                        const hasSubItems = item.subItems && item.subItems.length > 0;
+
                         return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setIsSidebarOpen(false)}
-                                className={`nav-link ${pathname === item.href ? "active" : ""}`}
-                            >
-                                <Icon size={20} />
-                                <span>{item.label}</span>
-                            </Link>
+                            <div key={item.label} className="space-y-1">
+                                {hasSubItems ? (
+                                    <button
+                                        onClick={() => toggleMenu(item.label)}
+                                        className={`nav-link w-full flex items-center justify-between ${pathname.startsWith(item.href) ? "active" : ""}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Icon size={20} />
+                                            <span>{item.label}</span>
+                                        </div>
+                                        <ChevronDown size={16} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+                                ) : (
+                                    <Link
+                                        href={item.href}
+                                        onClick={() => setIsSidebarOpen(false)}
+                                        className={`nav-link ${pathname === item.href ? "active" : ""}`}
+                                    >
+                                        <Icon size={20} />
+                                        <span>{item.label}</span>
+                                    </Link>
+                                )}
+
+                                {hasSubItems && isExpanded && (
+                                    <div className="pl-11 space-y-1">
+                                        {item.subItems.map((sub: any) => (
+                                            <Link
+                                                key={sub.href}
+                                                href={sub.href}
+                                                onClick={() => setIsSidebarOpen(false)}
+                                                className={`block py-2 text-sm text-slate-400 hover:text-white transition-colors ${pathname === sub.href ? "text-emerald-400 font-bold" : ""}`}
+                                            >
+                                                {sub.label}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
                 </nav>
@@ -200,6 +301,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
 
                     <div className="flex items-center gap-4 lg:gap-6">
+                        {/* Session Timer - Click to Extend */}
+                        <button
+                            onClick={extendSession}
+                            title="Click to extend session to 45 minutes"
+                            className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer hover:bg-slate-100 active:scale-95 ${timeLeft < 300 ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-500'
+                                }`}>
+                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Session</span>
+                            <span className="text-xs font-black font-mono">
+                                {formatTime(timeLeft)}
+                            </span>
+                        </button>
+
                         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Market</span>
                             <span className="text-xs font-black text-emerald-600 font-mono">1.48k</span>

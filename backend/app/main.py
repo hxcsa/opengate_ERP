@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import router as api_router
 from app.core.firebase import init_firebase
 
-app = FastAPI(title="Iraqi ERP API (Firebase)", version="1.0.0")
+app = FastAPI(title="Iraqi ERP API (Firebase)", version="1.0.0", redirect_slashes=False)
 
 # Add CORS middleware
 app.add_middleware(
@@ -22,4 +22,8 @@ async def startup_event():
 async def root():
     return {"message": "Welcome to Iraqi ERP API (Firebase)"}
 
+# Mount the single monolithic router
+# The router in app.api.__init__ already includes /reports/..., /users/..., etc.
+# but some might be defined with absolute paths like "/users/me".
+# If we mount with prefix="/api", they become "/api/users/me", which matches the frontend expectations.
 app.include_router(api_router, prefix="/api")

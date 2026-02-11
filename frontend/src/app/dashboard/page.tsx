@@ -10,8 +10,11 @@ import {
 } from "lucide-react";
 import SaleForm from "@/components/SaleForm";
 import PurchaseForm from "@/components/PurchaseForm";
-import { auth } from "@/lib/firebase";
 import React, { useCallback, memo } from "react";
+import { fetchWithAuth } from "@/lib/api";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
 
 const KpiCard = memo(({ title, value, icon, trend, trendUp, description }: any) => (
     <div className="enterprise-card flex flex-col justify-between group">
@@ -101,25 +104,39 @@ export default function Dashboard() {
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
     const [loading, setLoading] = useState(true);
+    const [authReady, setAuthReady] = useState(false);
+    const [authUser, setAuthUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (user) => {
+            setAuthUser(user);
+            setAuthReady(true);
+        });
+        return () => unsub();
+    }, []);
 
     const fetchData = useCallback(async () => {
+        if (!authReady || !authUser) return;
         setLoading(true);
         try {
             const [journalsRes, itemsRes, statsRes, trendRes] = await Promise.all([
-                fetch("/api/accounting/journals?limit=5"),
-                fetch("/api/inventory/items?limit=5"),
-                fetch("/api/reports/dashboard"),
-                fetch("/api/reports/weekly-trend")
+                fetchWithAuth("/api/accounting/journals?limit=5"),
+                fetchWithAuth("/api/inventory/items?limit=5"),
+                fetchWithAuth("/api/reports/dashboard"),
+                fetchWithAuth("/api/reports/weekly-trend")
             ]);
 
             // Safe JSON parsing with error handling
-            const journals = journalsRes.ok ? await journalsRes.json() : [];
-            const itemsData = itemsRes.ok ? await itemsRes.json() : [];
+            const journalsData = journalsRes.ok ? await journalsRes.json() : { journals: [] };
+            const itemsData = itemsRes.ok ? await itemsRes.json() : { items: [] };
             const statsData = statsRes.ok ? await statsRes.json() : { cashBalance: "0", lowStock: 0, todaySales: "0", pendingInvoices: 0 };
             const trendData = trendRes.ok ? await trendRes.json() : [];
 
-            if (Array.isArray(journals)) setJournalEntries(journals);
-            if (Array.isArray(itemsData)) setItems(itemsData);
+            const journals = journalsData.journals || (Array.isArray(journalsData) ? journalsData : []);
+            const itemsList = itemsData.items || (Array.isArray(itemsData) ? itemsData : []);
+
+            setJournalEntries(journals);
+            setItems(itemsList);
             if (statsData) setStats(statsData);
             if (Array.isArray(trendData)) setChartData(trendData);
         } catch (error) {
@@ -133,6 +150,14 @@ export default function Dashboard() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    if (!authReady) {
+        return (
+            <div className="flex items-center justify-center h-[50vh]">
+                <Loader2 className="animate-spin text-blue-600" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -302,10 +327,8 @@ export default function Dashboard() {
                 </div>
                 <button
                     onClick={async () => {
-                        const token = await auth.currentUser?.getIdToken();
-                        const res = await fetch("/api/setup/repair-admin", {
-                            method: "POST",
-                            headers: { "Authorization": `Bearer ${token}` }
+                        const res = await fetchWithAuth("/api/setup/repair-admin", {
+                            method: "POST"
                         });
                         if (res.ok) {
                             alert("Account promoted to Admin. Please refresh the page.");

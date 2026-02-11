@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save, Plus, Trash2, Package, Truck, User, Building2 } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 interface PurchaseFormProps {
     onClose: () => void;
@@ -20,8 +21,9 @@ export default function PurchaseForm({ onClose, onSuccess }: PurchaseFormProps) 
     });
 
     useEffect(() => {
-        fetch("/api/inventory/items").then(res => res.json()).then(data => {
-            if (Array.isArray(data)) setItems(data);
+        fetchWithAuth("/api/inventory/items").then(res => res.json()).then(data => {
+            const list = data.items || (Array.isArray(data) ? data : []);
+            setItems(list);
         });
     }, []);
 
@@ -47,9 +49,8 @@ export default function PurchaseForm({ onClose, onSuccess }: PurchaseFormProps) 
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch("/api/inventory/grn", {
+            const res = await fetchWithAuth("/api/inventory/grn", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
             });
             if (res.ok) {

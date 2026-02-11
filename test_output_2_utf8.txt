@@ -1,0 +1,179 @@
+﻿python : C:\Users\razer\AppData\
+Local\Programs\Python\python39\l
+ib\site-packages\google\api_core
+\_python_version_support.py:246:
+ FutureWarning: You are using a 
+non-supported Python version 
+(3.9.13). Google will not post 
+any further updates to 
+google.api_core supporting this 
+Python version. Please upgrade 
+to the latest Python version, 
+or at least Python 3.10, and 
+then update google.api_core.
+At line:1 char:1
++ python 
+backend/verify_invoices.py > 
+test_output_2.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: (C:\Users\raze  
+  r\...oogle.api_core.:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+  warnings.warn(message, 
+FutureWarning)
+C:\Users\razer\AppData\Local\Pro
+grams\Python\python39\lib\site-p
+ackages\google\cloud\firestore_v
+1\base_collection.py:316: 
+UserWarning: Detected filter 
+using positional arguments. 
+Prefer using the 'filter' 
+keyword argument instead.
+  return 
+query.where(field_path, 
+op_string, value)
+C:\Users\razer\OneDrive\Desktop\
+ERP\backend\app\services\invoice
+s.py:42: UserWarning: Detected 
+filter using positional 
+arguments. Prefer using the 
+'filter' keyword argument 
+instead.
+  query = query.where("status", 
+"==", status)
+Traceback (most recent call 
+last):
+[Firebase] Initializing from file: C:\Users\razer\OneDrive\Desktop\ERP\backend\service_account.json
+[Firebase] Initialized successfully!
+Initializing Firebase...
+
+--- Test 1: Create Draft Invoice ---
+Created Invoice ID: TqGOM1Bd5qDA2XU45HNf
+[PASS] Draft Created Successfully
+
+--- Test 2: Issue Invoice ---
+[PASS] Invoice Issued Successfully
+
+--- Test 3: Partial Payment ---
+[PASS] Partial Payment Recorded
+
+--- Test 4: Full Payment ---
+[PASS] Full Payment Recorded & Status Updated to PAID
+
+--- Test 5: List Filters ---
+  File "C:\Users\razer\OneDrive\
+Desktop\ERP\backend\verify_invoi
+ces.py", line 80, in <module>
+    verify_invoices()
+  File "C:\Users\razer\OneDrive\
+Desktop\ERP\backend\verify_invoi
+ces.py", line 64, in 
+verify_invoices
+    results = service.list_invoi
+ces(company_id=user["company_id"
+], status="PAID")
+  File "C:\Users\razer\OneDrive\
+Desktop\ERP\backend\app\services
+\invoices.py", line 60, in 
+list_invoices
+    invoices = [{"id": d.id, 
+**d.to_dict()} for d in docs]
+  File "C:\Users\razer\OneDrive\
+Desktop\ERP\backend\app\services
+\invoices.py", line 60, in 
+<listcomp>
+    invoices = [{"id": d.id, 
+**d.to_dict()} for d in docs]
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\cloud\fir
+estore_v1\stream_generator.py", 
+line 58, in __next__
+    return 
+self._generator.__next__()
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\cloud\fir
+estore_v1\query.py", line 422, 
+in _make_stream
+    response_iterator, 
+expected_prefix = 
+self._get_stream_iterator(
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\cloud\fir
+estore_v1\query.py", line 267, 
+in _get_stream_iterator
+    response_iterator = self._cl
+ient._firestore_api.run_query(
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\cloud\fir
+estore_v1\services\firestore\cli
+ent.py", line 1643, in run_query
+    response = rpc(
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+gapic_v1\method.py", line 131, 
+in __call__
+    return wrapped_func(*args, 
+**kwargs)
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+retry\retry_unary.py", line 
+294, in retry_wrapped_func
+    return retry_target(
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+retry\retry_unary.py", line 
+156, in retry_target
+    next_sleep = 
+_retry_error_helper(
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+retry\retry_base.py", line 214, 
+in _retry_error_helper
+    raise final_exc from 
+source_exc
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+retry\retry_unary.py", line 
+147, in retry_target
+    result = target()
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+timeout.py", line 130, in 
+func_with_timeout
+    return func(*args, **kwargs)
+  File "C:\Users\razer\AppData\L
+ocal\Programs\Python\python39\li
+b\site-packages\google\api_core\
+grpc_helpers.py", line 173, in 
+error_remapped_callable
+    raise 
+exceptions.from_grpc_error(exc) 
+from exc
+google.api_core.exceptions.Faile
+dPrecondition: 400 The query 
+requires an index. You can 
+create it here: https://console.
+firebase.google.com/v1/r/project
+/grinders-7e982/firestore/indexe
+s?create_composite=Ck9wcm9qZWN0c
+y9ncmluZGVycy03ZTk4Mi9kYXRhYmFzZ
+XMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hc
+m91cHMvaW52b2ljZXMvaW5kZXhlcy9fE
+AEaDgoKY29tcGFueV9pZBABGgoKBnN0Y
+XR1cxABGg4KCmlzc3VlX2RhdGUQAhoMC
+ghfX25hbWVfXxAC

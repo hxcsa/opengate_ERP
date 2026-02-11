@@ -59,6 +59,7 @@ export const translations = {
     trialBalanceReport: { en: "Trial Balance Report", ar: "تقارير ميزان المراجعة" },
     accountCode: { en: "Code", ar: "الكود" },
     accountName: { en: "Account", ar: "الحساب" },
+    type: { en: "Type", ar: "النوع" },
     debit: { en: "Debit", ar: "مدين" },
     credit: { en: "Credit", ar: "دائن" },
     balance: { en: "Balance", ar: "الرصيد" },

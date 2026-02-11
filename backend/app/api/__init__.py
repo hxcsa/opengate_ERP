@@ -1,16 +1,20 @@
-from typing import List
+from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from google.cloud import firestore
 from app.core.firebase import get_db
 from app.core.auth import get_current_user
 from app.core.audit import get_audit_logger
 from app.schemas.erp import (
-    AccountCreate, ItemCreate, JournalEntryCreate, 
-    GRNCreate, DeliveryNoteCreate, EmployeeCreate
+    ItemCreate, GRNCreate, DeliveryNoteCreate, EmployeeCreate
+)
+from app.schemas.accounting import (
+    AccountCreate, JournalEntryCreate, 
+    PaymentVoucherCreate, ReceiptVoucherCreate, CreditNoteCreate
 )
 from app.services.inventory import InventoryService
 from app.services.accounting import AccountingService
+from app.services.vouchers import get_voucher_service
 from app.services.reporting import ReportingService
 from app.services.integration import IntegrationService, ReturnCreate, TransferCreate
 from app.services.lifecycle import get_lifecycle_service
@@ -24,32 +28,70 @@ from app.services.assets import get_fixed_asset_service
 
 router = APIRouter()
 
+# ===================== DIAGNOSTICS =====================
+@router.get("/debug/routes")
+async def debug_routes():
+    """List all registered routes (no auth required) for debugging."""
+    return {
+        "status": "ok",
+        "message": "Backend is running",
+        "registered_sub_routers": [
+            "/accounting (GET /accounts, POST /accounts, GET /journals)",
+            "/credit-notes (GET /, POST /)",
+            "/expenses (GET /, POST /)",
+        ]
+    }
+
+@router.get("/debug/auth-test")
+async def debug_auth_test(request: Request):
+    """Test auth header forwarding (no auth required) - shows what headers arrive."""
+    auth_header = request.headers.get("Authorization")
+    all_headers = dict(request.headers)
+    return {
+        "auth_header_present": bool(auth_header),
+        "auth_header_preview": str(auth_header)[:50] if auth_header else None,
+        "all_header_keys": list(all_headers.keys()),
+        "host": all_headers.get("host"),
+        "origin": all_headers.get("origin"),
+    }
+
 # ===================== SETUP =====================
 @router.post("/setup/seed-coa")
 async def seed_coa():
     count = seed_iraqi_coa()
     return {"message": f"Iraqi COA seeded successfully. {count} accounts created."}
 
+# ===================== USER PROFILE =====================
+@router.get("/me")
+async def get_current_user_profile(user: dict = Depends(get_current_user)):
+    """Get current authenticated user profile."""
+    return {
+        "uid": user.get("uid"),
+        "email": user.get("email"),
+        "role": user.get("role"),
+        "company_id": user.get("company_id"),
+        "full_name": user.get("full_name"),
+        "phone": user.get("phone")
+    }
 
-# ===================== ACCOUNTS =====================
-@router.get("/accounts")
-async def get_accounts(limit: int = 100, offset: int = 0):
-    """Get accounts with pagination for performance."""
-    db = get_db()
-    # Use limit to prevent fetching entire collection
-    docs = db.collection("accounts").order_by("code").limit(limit).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+# ===================== ACCOUNTING =====================
+from app.api.accounting import router as accounting_router
+router.include_router(accounting_router, prefix="/accounting", tags=["Accounting"])
+# Backward-compatible: also mount at root so /api/accounts and /api/accounting/accounts both work
+router.include_router(accounting_router, tags=["Accounting (Legacy)"])
 
-@router.post("/accounts")
-async def create_account(data: AccountCreate):
-    db = get_db()
-    doc_ref = db.collection("accounts").document()
-    doc_ref.set(data.model_dump())
-    return {"id": doc_ref.id, **data.model_dump()}
+# ===================== CREDIT NOTES =====================
+from app.api.credit_notes import router as credit_notes_router
+router.include_router(credit_notes_router, prefix="/credit-notes", tags=["Credit Notes"])
+
+# ===================== EXPENSES =====================
+from app.api.expenses import router as expenses_router
+router.include_router(expenses_router, prefix="/expenses", tags=["Expenses"])
 
 # ===================== ITEMS =====================
 @router.get("/inventory/items")
-async def get_items(limit: int = 100):
+@router.get("/items")
+async def get_items(limit: int = 200):
     """Get items with pagination for performance."""
     db = get_db()
     docs = db.collection("items").limit(limit).stream()
@@ -66,16 +108,19 @@ async def create_item(data: ItemCreate):
 
 # ===================== WAREHOUSES =====================
 @router.get("/warehouses")
-async def get_warehouses():
+async def get_warehouses(user: dict = Depends(get_current_user)):
     db = get_db()
-    docs = db.collection("warehouses").stream()
+    company_id = user.get("company_id")
+    docs = db.collection("warehouses").where("company_id", "==", company_id).stream()
     return [{"id": doc.id, **doc.to_dict()} for doc in docs]
 
 @router.post("/warehouses")
-async def create_warehouse(name: str, location: str = ""):
+async def create_warehouse(name: str, location: str = "", user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Admin only")
     db = get_db()
     doc_ref = db.collection("warehouses").document()
-    doc_ref.set({"name": name, "location": location})
+    doc_ref.set({"name": name, "location": location, "company_id": user.get("company_id")})
     return {"id": doc_ref.id, "name": name, "location": location}
 
 # ===================== INVENTORY TRANSACTIONS =====================
@@ -126,9 +171,11 @@ async def create_transfer(data: TransferCreate):
 
 # ===================== ACCOUNTING =====================
 @router.post("/accounting/journal")
-async def create_journal(data: JournalEntryCreate):
+async def create_journal(data: JournalEntryCreate, user: dict = Depends(get_current_user)):
     service = AccountingService()
     try:
+        # Ensure company_id is set from user token
+        data.company_id = user.get("company_id")
         je_id = service.create_journal_entry(data)
         return {"message": "Journal Entry Posted", "id": je_id}
     except ValueError as e:
@@ -137,43 +184,170 @@ async def create_journal(data: JournalEntryCreate):
         raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
 
 @router.get("/accounting/journals")
-async def get_journals(limit: int = 50):
-    """Get recent journals with pagination."""
+async def get_journals(limit: int = 50, user: dict = Depends(get_current_user)):
+    """Get recent journals for the company with in-memory sorting to avoid index issues."""
+    try:
+        db = get_db()
+        company_id = user.get("company_id")
+        
+        # Fetch all (or a reasonable set) and sort in memory
+        # We use a simple query first
+        docs = db.collection("journal_entries")\
+            .where("company_id", "==", company_id)\
+            .stream()
+            
+        journals = []
+        for doc in docs:
+            data = doc.to_dict()
+            journals.append({"id": doc.id, **data})
+            
+        # Sort by date descending
+        def get_date(item):
+            d = item.get("date")
+            if hasattr(d, "timestamp"): # Firestore Timestamp
+                return d.timestamp()
+            if isinstance(d, str):
+                try: return datetime.fromisoformat(d.replace("Z", "+00:00")).timestamp()
+                except: return 0
+            return 0
+
+        journals.sort(key=get_date, reverse=True)
+        return journals[:limit]
+    except Exception as e:
+        print(f"❌ Error in GET /accounting/journals: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===================== VOUCHERS =====================
+from app.api.vouchers import router as vouchers_router
+router.include_router(vouchers_router, prefix="/accounting/vouchers", tags=["Vouchers"])
+
+# ===================== CATEGORIES =====================
+
+@router.get("/accounting/categories")
+async def list_categories(
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """List accounting categories."""
     db = get_db()
-    # Limit and order by date descending for most recent first
-    docs = db.collection("journal_entries").order_by("date", direction=firestore.Query.DESCENDING).limit(limit).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    company_id = user.get("company_id")
+    docs = db.collection("categories").where("company_id", "==", company_id).stream()
+    
+    results = []
+    for doc in docs:
+        item = {"id": doc.id, **doc.to_dict()}
+        if status == "active" and not item.get("active", True):
+            continue
+        if status == "inactive" and item.get("active", True):
+            continue
+        if search:
+            s = search.lower()
+            searchable = f"{item.get('name_en','')} {item.get('name_ar','')} {item.get('description','')}".lower()
+            if s not in searchable:
+                continue
+        results.append(item)
+    
+    return {"categories": results, "total_count": len(results)}
+
+@router.post("/accounting/categories")
+async def create_category(data: dict, user: dict = Depends(get_current_user)):
+    """Create a new accounting category."""
+    db = get_db()
+    company_id = user.get("company_id")
+    
+    category_data = {
+        "name_en": data.get("name_en", ""),
+        "name_ar": data.get("name_ar", ""),
+        "description": data.get("description", ""),
+        "active": data.get("active", True),
+        "company_id": company_id,
+        "created_at": firestore.SERVER_TIMESTAMP
+    }
+    
+    doc_ref = db.collection("categories").document()
+    doc_ref.set(category_data)
+    
+    return {"status": "created", "id": doc_ref.id}
+
+@router.put("/accounting/categories/{category_id}")
+async def update_category(category_id: str, data: dict, user: dict = Depends(get_current_user)):
+    """Update an accounting category."""
+    db = get_db()
+    doc_ref = db.collection("categories").document(category_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    update_fields = {k: v for k, v in data.items() if k in ["name_en", "name_ar", "description", "active"]}
+    if update_fields:
+        doc_ref.update(update_fields)
+    
+    return {"status": "updated", "id": category_id}
+
+@router.delete("/accounting/categories/{category_id}")
+async def delete_category(category_id: str, user: dict = Depends(get_current_user)):
+    """Delete an accounting category."""
+    db = get_db()
+    doc_ref = db.collection("categories").document(category_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    doc_ref.delete()
+    return {"status": "deleted", "id": category_id}
+
 
 # ===================== REPORTS =====================
 @router.get("/reports/trial-balance")
-async def get_trial_balance():
+async def get_trial_balance(user: dict = Depends(get_current_user)):
     service = ReportingService()
-    return await service.get_trial_balance()
-
-@router.get("/reports/inventory-on-hand")
-async def get_inventory_on_hand():
-    service = ReportingService()
-    return await service.get_inventory_on_hand()
-
-@router.get("/reports/inventory-valuation")
-async def get_inventory_valuation():
-    service = ReportingService()
-    return await service.get_inventory_valuation()
-
-@router.get("/reports/general-ledger/{account_id}")
-async def get_general_ledger(account_id: str):
-    service = ReportingService()
-    return await service.get_general_ledger(account_id)
+    return await service.get_trial_balance(user.get("company_id"))
 
 @router.get("/reports/income-statement")
-async def get_income_statement():
+async def get_income_statement(user: dict = Depends(get_current_user)):
     service = ReportingService()
-    return await service.get_income_statement()
+    return await service.get_income_statement(user.get("company_id"))
 
 @router.get("/reports/balance-sheet")
-async def get_balance_sheet():
+async def get_balance_sheet(user: dict = Depends(get_current_user)):
     service = ReportingService()
-    return await service.get_balance_sheet()
+    return await service.get_balance_sheet(user.get("company_id"))
+
+@router.get("/reports/general-ledger")
+async def get_general_ledger(
+    account_id: str,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    service = ReportingService()
+    
+    # Parse dates if provided
+    start = datetime.fromisoformat(from_date) if from_date else None
+    end = datetime.fromisoformat(to_date) if to_date else None
+    
+    return await service.get_general_ledger(
+        user.get("company_id"),
+        account_id,
+        from_date=start,
+        to_date=end
+    )
+
+@router.get("/reports/aging/{report_type}")
+async def get_aging_report(report_type: str, user: dict = Depends(get_current_user)):
+    service = ReportingService()
+    return await service.get_aging_report(user.get("company_id"), report_type)
+
+@router.get("/reports/reconcile/ar")
+async def get_ar_reconciliation(user: dict = Depends(get_current_user)):
+    service = ReportingService()
+    return await service.get_ar_reconciliation(user.get("company_id"))
+
+@router.get("/reports/reconcile/ap")
+async def get_ap_reconciliation(user: dict = Depends(get_current_user)):
+    service = ReportingService()
+    return await service.get_ap_reconciliation(user.get("company_id"))
 
 # ===================== ENTERPRISE HARDENING =====================
 
@@ -319,9 +493,9 @@ async def reseed_all(user: dict = Depends(get_current_user)):
     return {"status": "success", "message": "System reseeded with consistent data"}
 
 @router.get("/reports/export/{report_type}")
-async def export_report(report_type: str):
+async def export_report(report_type: str, user: dict = Depends(get_current_user)):
     service = ReportingService()
-    csv_content = await service.export_to_csv(report_type)
+    csv_content = await service.export_to_csv(report_type, user.get("company_id"))
     from fastapi.responses import StreamingResponse
     import io
     return StreamingResponse(
@@ -470,9 +644,283 @@ async def download_purchase_invoice(po_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- Purchase Orders ---
+# --- Invoices (Sales) ---
+from app.services.invoices import get_invoice_service
+from app.schemas.invoices import InvoiceCreate
+
+@router.get("/sales/invoices")
+async def list_invoices(
+    status: Optional[str] = None, 
+    customer_id: Optional[str] = None,
+    search: Optional[str] = None,
+    dateFrom: Optional[str] = None,
+    dateTo: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    user: dict = Depends(get_current_user)
+):
+    """List invoices with filters."""
+    service = get_invoice_service()
+    
+    # Parse dates if provided
+    date_from = None
+    date_to = None
+    if dateFrom:
+        try:
+            date_from = datetime.fromisoformat(dateFrom)
+        except ValueError:
+            pass
+    if dateTo:
+        try:
+            date_to = datetime.fromisoformat(dateTo)
+        except ValueError:
+            pass
+    
+    return service.list_invoices(
+        company_id=user.get("company_id"),
+        status=status,
+        customer_id=customer_id,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        page_size=page_size
+    )
+
+@router.post("/sales/invoices")
+async def create_invoice(data: InvoiceCreate, user: dict = Depends(get_current_user)):
+    """Create a new invoice."""
+    service = get_invoice_service()
+    invoice_id = service.create_invoice(data, user)
+    
+    # Audit log
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_create("invoices", invoice_id, data.model_dump(), f"Created invoice {data.invoice_number}")
+    
+    return {"status": "created", "id": invoice_id}
+
+@router.get("/sales/invoices/{invoice_id}")
+async def get_invoice(invoice_id: str, user: dict = Depends(get_current_user)):
+    """Get invoice details."""
+    service = get_invoice_service()
+    invoice = service.get_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return invoice
+
+@router.post("/sales/invoices/{invoice_id}/void")
+async def void_invoice(invoice_id: str, reason: str = "Voided by user", user: dict = Depends(get_current_user)):
+    """Void an invoice (Admin/Accountant only)."""
+    # Role check
+    if user.get("role") not in ["admin", "accountant"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    service = get_invoice_service()
+    inv_before = service.get_invoice(invoice_id)
+    result = service.void_invoice(invoice_id, reason, user)
+    
+    # Audit log
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_void("invoices", invoice_id, inv_before, f"Voided invoice: {reason}")
+    
+    return result
+
+@router.post("/sales/invoices/{invoice_id}/pay")
+async def mark_invoice_paid(
+    invoice_id: str, 
+    amount: float, 
+    payment_method: str = "CASH", 
+    user: dict = Depends(get_current_user)
+):
+    """Mark invoice as paid."""
+    if user.get("role") not in ["admin", "accountant"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+    service = get_invoice_service()
+    inv_before = service.get_invoice(invoice_id)
+    result = service.mark_paid(invoice_id, amount, payment_method, user)
+    
+    # Audit log
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_update("invoices", invoice_id, inv_before, result, f"Paid {amount} via {payment_method}")
+    
+    return result
+
+@router.put("/sales/invoices/{invoice_id}")
+async def update_invoice(invoice_id: str, data: dict, user: dict = Depends(get_current_user)):
+    """Update a DRAFT invoice."""
+    from app.schemas.invoices import InvoiceUpdate
+    service = get_invoice_service()
+    
+    update_data = InvoiceUpdate(**data)
+    result = service.update_invoice(invoice_id, update_data, user)
+    
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_update("invoices", invoice_id, {}, result, f"Updated invoice {invoice_id}")
+    
+    return result
+
+@router.post("/sales/invoices/{invoice_id}/issue")
+async def issue_invoice(invoice_id: str, user: dict = Depends(get_current_user)):
+    """Issue a DRAFT invoice (DRAFT -> ISSUED)."""
+    if user.get("role") not in ["admin", "accountant"]:
+        raise HTTPException(status_code=403, detail="Only admin/accountant can issue invoices")
+    
+    service = get_invoice_service()
+    result = service.mark_issued(invoice_id, user)
+    
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_update("invoices", invoice_id, {}, result, f"Issued invoice {invoice_id}")
+    
+    return result
+
+# ===================== CUSTOMERS =====================
+from app.services.customers import get_customers_service
+from app.schemas.customers import CustomerCreate
+
+@router.get("/customers")
+async def list_customers(
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    user: dict = Depends(get_current_user)
+):
+    """List customers with search and filters."""
+    service = get_customers_service(user)
+    return service.list_customers(search=search, status=status, page=page, page_size=page_size)
+
+@router.post("/customers")
+async def create_customer(data: CustomerCreate, user: dict = Depends(get_current_user)):
+    """Create a new customer."""
+    service = get_customers_service(user)
+    customer_id = service.create_customer(data.model_dump())
+    
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_create("customers", customer_id, data.model_dump(), f"Created customer {data.first_name} {data.last_name}")
+    
+    return {"status": "created", "id": customer_id}
+
+@router.get("/customers/{customer_id}")
+async def get_customer(customer_id: str, user: dict = Depends(get_current_user)):
+    """Get customer details."""
+    service = get_customers_service(user)
+    customer = service.get_customer(customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return customer
+
+@router.put("/customers/{customer_id}")
+async def update_customer(customer_id: str, data: dict, user: dict = Depends(get_current_user)):
+    """Update customer details."""
+    service = get_customers_service(user)
+    result = service.update_customer(customer_id, data)
+    
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_update("customers", customer_id, {}, result, f"Updated customer {customer_id}")
+    
+    return result
+
+# ===================== EMPLOYEES (Enhanced) =====================
+@router.get("/employees")
+async def list_employees(
+    search: Optional[str] = None,
+    role_filter: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """List all employees with optional search and role filter."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    db = get_db()
+    company_id = user.get("company_id")
+    docs = db.collection("users").where("company_id", "==", company_id).stream()
+    
+    results = []
+    for d in docs:
+        item = {"id": d.id, **d.to_dict()}
+        # Apply search filter
+        if search:
+            search_lower = search.lower()
+            name = (item.get("full_name") or item.get("email", "")).lower()
+            email = (item.get("email") or "").lower()
+            phone = (item.get("phone") or "").lower()
+            if not any(search_lower in f for f in [name, email, phone]):
+                continue
+        # Apply role filter
+        if role_filter and item.get("role") != role_filter:
+            continue
+        results.append(item)
+    
+    return {"employees": results, "total_count": len(results)}
+
+@router.post("/employees")
+async def create_employee(data: dict, user: dict = Depends(get_current_user)):
+    """Create a new employee with Firebase Auth + Firestore profile."""
+    service = get_users_service(user)
+    uid = service.create_employee(
+        email=data.get("email"),
+        password=data.get("password"),
+        role=data.get("role", "viewer"),
+        allowed_tabs=data.get("allowed_tabs")
+    )
+    
+    # Update with additional fields (full_name, phone)
+    db = get_db()
+    extra = {}
+    if data.get("full_name"):
+        extra["full_name"] = data["full_name"]
+    if data.get("phone"):
+        extra["phone"] = data["phone"]
+    if extra:
+        db.collection("users").document(uid).update(extra)
+    
+    audit = get_audit_logger(user.get("uid"), user.get("company_id"))
+    audit.log_create("employees", uid, {"email": data.get("email"), "role": data.get("role")}, f"Created employee {data.get('email')}")
+    
+    return {"status": "created", "id": uid}
+
+@router.put("/employees/{employee_id}")
+async def update_employee(employee_id: str, data: dict, user: dict = Depends(get_current_user)):
+    """Update employee details (Admin only)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    db = get_db()
+    doc_ref = db.collection("users").document(employee_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    update_fields = {k: v for k, v in data.items() if v is not None and k not in ["password", "id"]}
+    if update_fields:
+        doc_ref.update(update_fields)
+    
+    return {"status": "updated", "id": employee_id}
+
+# --- AP/Purchasing ---
+@router.get("/purchasing/bills")
+async def list_bills(
+    supplier_id: Optional[str] = None, 
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    db = get_db()
+    query = db.collection("bills").where("company_id", "==", user.get("company_id"))
+    if supplier_id:
+        query = query.where("supplier_id", "==", supplier_id)
+    if status:
+        query = query.where("status", "==", status)
+    
+    docs = query.stream()
+    return {"bills": [{"id": d.id, **d.to_dict()} for d in docs]}
+
+@router.get("/suppliers")
+async def list_suppliers(user: dict = Depends(get_current_user)):
+    db = get_db()
+    docs = db.collection("suppliers").where("company_id", "==", user.get("company_id")).stream()
+    return [{"id": d.id, **d.to_dict()} for d in docs]
 @router.get("/purchase-orders")
-async def list_purchase_orders(status: str = None, limit: int = 50):
+async def list_purchase_orders(status: Optional[str] = None, limit: int = 50):
     """List all purchase orders."""
     service = get_purchase_order_service()
     return service.list_purchase_orders(status, limit)
@@ -495,7 +943,7 @@ async def approve_purchase_order(po_id: str, user: dict = Depends(get_current_us
 # --- Fixed Assets ---
 
 @router.get("/assets")
-async def list_fixed_assets(status: str = "ACTIVE"):
+async def list_fixed_assets(status: Optional[str] = "ACTIVE"):
     """List all fixed assets."""
     service = get_fixed_asset_service()
     return service.list_assets(status)
@@ -514,7 +962,7 @@ async def get_asset_summary():
     return service.get_depreciation_summary()
 
 @router.post("/assets/{asset_id}/depreciate")
-async def record_depreciation(asset_id: str, period: str):
+async def record_depreciation(asset_id: str, period: str = None):
     """Record monthly depreciation for an asset."""
     service = get_fixed_asset_service()
     amount = service.calculate_monthly_depreciation(asset_id)
@@ -580,3 +1028,25 @@ async def create_announcement(data: dict, user: dict = Depends(get_current_user)
     if "created_at" in response_data:
         del response_data["created_at"]
     return response_data
+
+    return response_data
+
+@router.get("/debug/list-rv-no-auth")
+async def debug_list_rv():
+    """Debug endpoint without auth to test RV listing logic."""
+    db = get_db()
+    company_id = "opengate_hq_001"
+    docs = db.collection("receipt_vouchers").where("company_id", "==", company_id).stream()
+    results = []
+    for doc in docs:
+        results.append({"id": doc.id, **doc.to_dict()})
+    return results
+
+from app.api.reports import router as reports_router
+router.include_router(reports_router, prefix="/reports", tags=["Reports"])
+
+from app.api.credit_notes import router as cn_router
+router.include_router(cn_router, prefix="/credit-notes", tags=["Credit Notes"])
+
+from app.api.expenses import router as exp_router
+router.include_router(exp_router, prefix="/expenses", tags=["Expenses"])

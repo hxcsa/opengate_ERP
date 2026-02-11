@@ -12,8 +12,11 @@ import TransferForm from "@/components/TransferForm";
 import ReconciliationForm from "@/components/ReconciliationForm";
 import InventoryAnalytics from "@/components/InventoryAnalytics";
 import { useLanguage } from "@/contexts/LanguageContext";
-
 import React, { useCallback, memo } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { fetchWithAuth } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 // Memoized Action Button
 const InventoryAction = memo(({ title, sub, icon, color, onClick }: any) => (
@@ -81,22 +84,46 @@ export default function Inventory() {
     const [showReconcileModal, setShowReconcileModal] = useState(false);
     const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
     const [historyItem, setHistoryItem] = useState<any>(null);
+    const [authReady, setAuthReady] = useState(false);
+    const [authUser, setAuthUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (user) => {
+            setAuthUser(user);
+            setAuthReady(true);
+        });
+        return () => unsub();
+    }, []);
+
     const { t } = useLanguage();
 
-    const fetchItems = useCallback(() => {
+    const fetchItems = useCallback(async () => {
+        if (!authReady || !authUser) return;
         setLoading(true);
-        fetch("/api/inventory/items")
-            .then((res) => res.json())
-            .then((data) => {
-                if (Array.isArray(data)) setItems(data);
-                setLoading(false);
-            })
-            .catch(() => setLoading(false));
+        try {
+            const res = await fetchWithAuth("/api/inventory/items");
+            if (res.ok) {
+                const data = await res.json();
+                setItems(data.items || (Array.isArray(data) ? data : []));
+            }
+        } catch (err) {
+            console.error("Failed to fetch inventory items:", err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
         fetchItems();
-    }, []);
+    }, [fetchItems]);
+
+    if (!authReady) {
+        return (
+            <div className="flex items-center justify-center h-[50vh]">
+                <Loader2 className="animate-spin text-primary" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -197,12 +224,14 @@ function HistoryModal({ item, onClose }: any) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch(`/api/inventory/history?item_id=${item.id}`)
+        fetchWithAuth(`/api/inventory/history?item_id=${item.id}`)
             .then(res => res.json())
             .then(data => {
-                setHistory(data);
+                const list = Array.isArray(data) ? data : (data.history || []);
+                setHistory(list);
                 setLoading(false);
-            });
+            })
+            .catch(() => setLoading(false));
     }, [item]);
 
     return (

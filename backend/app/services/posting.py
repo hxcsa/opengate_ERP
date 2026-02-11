@@ -8,14 +8,20 @@ class PostingEngine:
     def __init__(self):
         self.db = get_db()
 
-    def post_journal_entry(self, transaction, entry_id: str, lines_data: list = None):
-        """Finalizes a journal entry using Firestore Transaction.
-        NOTE: This method must be called from within an existing @firestore.transactional function.
-        IMPORTANT: DO NOT READ THE JOURNAL HERE. We update status directly. Balance check happens before calling.
-        """
+    def get_accounts_for_transaction(self, transaction, account_ids: list[str]) -> Dict[str, Dict[str, Any]]:
+        """Pre-fetches accounts for a transaction to avoid Read-after-Write violations."""
+        if not account_ids:
+            return {}
+        unique_ids = list(set(account_ids))
+        refs = [self.db.collection("accounts").document(aid) for aid in unique_ids]
+        snapshots = self.db.get_all(refs, transaction=transaction)
+        return {snap.id: snap.to_dict() or {} for snap in snapshots}
+
+    def post_journal_entry(self, transaction, entry_id: str, lines_data: list = None, accounts_data: Dict[str, Any] = None):
+        """Finalizes a journal entry using Firestore Transaction."""
         entry_ref = self.db.collection("journal_entries").document(entry_id)
         
-        # If lines_data is provided, validate balance; otherwise, trust the caller already validated.
+        # Validate balance
         if lines_data:
             total_debit = Decimal("0")
             total_credit = Decimal("0")
@@ -25,38 +31,43 @@ class PostingEngine:
             if abs(total_debit - total_credit) > Decimal("0.0001"):
                 raise ValueError(f"Journal does not balance: D:{total_debit} C:{total_credit}")
 
-        # Update status directly
+        # Update status
         transaction.update(entry_ref, {"status": "POSTED"})
 
-        # --- REAL-TIME BALANCE UPDATE (ORACLE MODE) ---
-        if lines_data:
+        # Update Account Balances (Read-Modify-Write for String Fields)
+        if lines_data and accounts_data:
             for line in lines_data:
                 acc_id = line.get("account_id")
-                if not acc_id: continue
+                if not acc_id or acc_id not in accounts_data: continue
                 
                 debit = Decimal(str(line.get("debit", "0")))
                 credit = Decimal(str(line.get("credit", "0")))
                 
-                # We must READ the account to get current balance
-                # BUT we are in a transaction, so we must separate reads first? 
-                # Firestore transactions require all reads before writes.
-                # However, since we didn't read accounts at the top, we might hit a limitation here 
-                # if we try to read "accounts" now after writing "journal_entries".
-                # FIX: We should have read accounts before the update. 
-                # OR simpler for now: Use FieldValue.increment if available, but Python SDK uses transactional get/update.
+                # Get current values from pre-fetched data
+                current_acc = accounts_data[acc_id]
+                current_debit = Decimal(str(current_acc.get("total_debit", "0")))
+                current_credit = Decimal(str(current_acc.get("total_credit", "0")))
+                current_balance = Decimal(str(current_acc.get("balance", "0")))
                 
-                # To clear the "Read after Write" error, we will do a separate atomic increment operation 
-                # or we just rely on the fact that for "High Scale" we might want to use 
-                # Distributed Counters or just accept the Read-Write pattern.
+                # Calculate new values
+                new_debit = current_debit + debit
+                new_credit = current_credit + credit
+                # Asset/Expense: Debit increases. Liability/Equity/Income: Credit increases.
+                # BUT traditionally balance = Debit - Credit for simple storage
+                new_balance = new_debit - new_credit
                 
-                # Let's use the transform `increment` which doesn't require a read!
-                # perfect for high throughput.
+                # Update in transaction
                 acc_ref = self.db.collection("accounts").document(acc_id)
                 transaction.update(acc_ref, {
-                    "total_debit": firestore.Increment(float(debit)),
-                    "total_credit": firestore.Increment(float(credit)),
-                    "balance": firestore.Increment(float(debit - credit)) 
+                    "total_debit": str(new_debit),
+                    "total_credit": str(new_credit),
+                    "balance": str(new_balance)
                 })
+                
+                # Update local cache in case multiple lines touch same account
+                accounts_data[acc_id]["total_debit"] = str(new_debit)
+                accounts_data[acc_id]["total_credit"] = str(new_credit)
+                accounts_data[acc_id]["balance"] = str(new_balance)
         
         return True
 

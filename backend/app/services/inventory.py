@@ -144,8 +144,43 @@ class InventoryService:
             })
 
             # 4. Post Journal (pass lines for balance check, avoiding re-read)
-            posting_engine.post_journal_entry(transaction, je_id, lines_data)
+            # Pre-fetch accounts for atomic balance updates
+            account_ids = list(set(line["account_id"] for line in lines_data))
+            accounts_data = posting_engine.get_accounts_for_transaction(transaction, account_ids)
             
+            posting_engine.post_journal_entry(transaction, je_id, lines_data, accounts_data)
+            
+            # --- AP SUBLEDGER LINK ---
+            if getattr(data, "supplier_id", None):
+                # Create a Bill record for AP tracking
+                from app.schemas.bills import BillStatus, BillLine
+                
+                bill_ref = db.collection("bills").document()
+                bill_lines = [
+                    {"description": f"GRN Item: {line.item_id}", "quantity": float(line.quantity), "unit_cost": float(line.unit_cost), "total": float(Decimal(str(line.quantity)) * Decimal(str(line.unit_cost)))}
+                    for line in data.lines
+                ]
+                
+                # Fetch supplier name to avoid join later
+                supplier_snap = db.collection("suppliers").document(data.supplier_id).get(transaction=transaction)
+                supplier_name = supplier_snap.to_dict().get("name", "Unknown") if supplier_snap.exists else "Unknown"
+                
+                transaction.set(bill_ref, {
+                    "bill_number": f"BILL-{data.number}",
+                    "supplier_id": data.supplier_id,
+                    "supplier_name": supplier_name,
+                    "date": firestore.SERVER_TIMESTAMP,
+                    "due_date": firestore.SERVER_TIMESTAMP, # Simplification: due now
+                    "total": str(total_value),
+                    "paid_amount": "0.0000",
+                    "remaining_amount": str(total_value),
+                    "status": "POSTED",
+                    "company_id": items_data_map[unique_item_ids[0]].get("company_id"), # Get from first item
+                    "journal_id": je_id,
+                    "source_doc_id": data.number,
+                    "source_doc_type": "GRN"
+                })
+
             return je_id
 
         return _execute(transaction, self.db, self.posting_engine, data)
@@ -295,7 +330,11 @@ class InventoryService:
             })
 
             # 4. Post (pass lines for balance check, avoiding re-read)
-            posting_engine.post_journal_entry(transaction, je_id, lines_data)
+            # Pre-fetch accounts for atomic balance updates
+            account_ids = list(set(line["account_id"] for line in lines_data))
+            accounts_data = posting_engine.get_accounts_for_transaction(transaction, account_ids)
+            
+            posting_engine.post_journal_entry(transaction, je_id, lines_data, accounts_data)
             
             return je_id
 

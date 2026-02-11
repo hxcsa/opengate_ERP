@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { auth } from "@/lib/firebase";
+import { fetchWithAuth } from "@/lib/api";
 import { Users, UserPlus, Shield, Mail, Key, X, CheckSquare, Square, Save, Loader2 } from "lucide-react";
 
 const AVAILABLE_TABS = [
@@ -29,12 +30,7 @@ export default function UsersPage() {
     const [editingUser, setEditingUser] = useState<any>(null);
 
     const fetchEmployees = async () => {
-        const user = auth.currentUser;
-        if (!user) return;
-        const token = await user.getIdToken();
-        const res = await fetch("/api/users", {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
+        const res = await fetchWithAuth("/api/users");
         if (res.ok) {
             const data = await res.json();
             setEmployees(data);
@@ -56,17 +52,10 @@ export default function UsersPage() {
         e.preventDefault();
         setMessage("");
         setIsSubmitting(true);
-        const user = auth.currentUser;
-        if (!user) return;
 
         try {
-            const token = await user.getIdToken();
-            const res = await fetch("/api/users", {
+            const res = await fetchWithAuth("/api/users", {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                },
                 body: JSON.stringify({
                     email,
                     password,
@@ -93,26 +82,15 @@ export default function UsersPage() {
     };
 
     const handleUpdateRole = async (uid: string, newRole: string) => {
-        const user = auth.currentUser;
-        if (!user) return;
-        const token = await user.getIdToken();
-        await fetch(`/api/users/${uid}?role=${newRole}`, {
-            method: "PUT",
-            headers: { "Authorization": `Bearer ${token}` }
+        await fetchWithAuth(`/api/users/${uid}?role=${newRole}`, {
+            method: "PUT"
         });
         fetchEmployees();
     };
 
     const handleUpdatePermissions = async (uid: string, tabs: string[]) => {
-        const user = auth.currentUser;
-        if (!user) return;
-        const token = await user.getIdToken();
-        const res = await fetch(`/api/users/${uid}/permissions`, {
+        const res = await fetchWithAuth(`/api/users/${uid}/permissions`, {
             method: "PUT",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
             body: JSON.stringify(tabs)
         });
 
@@ -124,12 +102,8 @@ export default function UsersPage() {
 
     const handleDeleteUser = async (uid: string) => {
         if (!confirm("Are you sure you want to delete this account? / هل أنت متأكد من حذف الحساب؟")) return;
-        const user = auth.currentUser;
-        if (!user) return;
-        const token = await user.getIdToken();
-        await fetch(`/api/users/${uid}`, {
-            method: "DELETE",
-            headers: { "Authorization": `Bearer ${token}` }
+        await fetchWithAuth(`/api/users/${uid}`, {
+            method: "DELETE"
         });
         fetchEmployees();
     };
@@ -204,8 +178,8 @@ export default function UsersPage() {
                                         type="button"
                                         onClick={() => toggleTab(tab.id)}
                                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-bold ${selectedTabs.includes(tab.id)
-                                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
-                                                : "bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-200"
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20"
+                                            : "bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-200"
                                             }`}
                                     >
                                         {selectedTabs.includes(tab.id) ? <CheckSquare size={18} /> : <Square size={18} />}
@@ -344,8 +318,8 @@ export default function UsersPage() {
                                             setEditingUser({ ...editingUser, allowed_tabs: next });
                                         }}
                                         className={`flex items-center gap-3 p-4 rounded-2xl border transition-all font-bold ${isAllowed
-                                                ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/10"
-                                                : "bg-slate-50 border-slate-100 text-slate-400 hover:bg-white"
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/10"
+                                            : "bg-slate-50 border-slate-100 text-slate-400 hover:bg-white"
                                             }`}
                                     >
                                         {isAllowed ? <CheckSquare size={18} /> : <Square size={18} />}

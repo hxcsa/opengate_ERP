@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Book, Search, Calendar, Hash, FileText } from "lucide-react";
+import { X, Book, Search, Calculator, Calendar } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface JournalViewerProps {
@@ -12,13 +13,14 @@ export default function JournalViewer({ onClose }: JournalViewerProps) {
     const [journals, setJournals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const { t, locale } = useLanguage();
+    const { t } = useLanguage();
 
     useEffect(() => {
-        fetch("/api/accounting/journals?limit=100")
+        fetchWithAuth("/api/accounting/journals?limit=100")
             .then(res => res.json())
             .then(data => {
-                if (Array.isArray(data)) setJournals(data);
+                const list = data.journals || (Array.isArray(data) ? data : []);
+                setJournals(list);
                 setLoading(false);
             })
             .catch(() => setLoading(false));

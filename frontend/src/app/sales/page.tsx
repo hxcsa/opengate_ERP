@@ -5,6 +5,7 @@ import { Plus, FileText, ShoppingCart, ArrowRight, Search, Filter, Check, X, Clo
 import { useLanguage } from "@/contexts/LanguageContext";
 import QuotationForm from "@/components/QuotationForm";
 import React, { useCallback, memo } from "react";
+import { fetchWithAuth } from "@/lib/api";
 
 const StatusBadge = memo(({ status }: { status: string }) => {
     const colors: Record<string, string> = {
@@ -80,8 +81,8 @@ export default function SalesPage() {
         setLoading(true);
         try {
             const [quoRes, soRes] = await Promise.all([
-                fetch("/api/quotations"),
-                fetch("/api/sales-orders")
+                fetchWithAuth("/api/quotations"),
+                fetchWithAuth("/api/sales-orders")
             ]);
             const [quoData, soData] = await Promise.all([quoRes.json(), soRes.json()]);
             if (Array.isArray(quoData)) setQuotations(quoData);
@@ -96,7 +97,7 @@ export default function SalesPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const convertToOrder = useCallback(async (quoId: string) => {
-        await fetch(`/api/quotations/${quoId}/convert`, { method: "POST" });
+        await fetchWithAuth(`/api/quotations/${quoId}/convert`, { method: "POST" });
         fetchData();
     }, [fetchData]);
 

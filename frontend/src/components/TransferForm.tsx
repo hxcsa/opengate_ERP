@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, ArrowRightLeft, Package, Warehouse } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 export default function TransferForm({ onClose, onSuccess }: any) {
     const [items, setItems] = useState<any[]>([]);
@@ -13,14 +14,20 @@ export default function TransferForm({ onClose, onSuccess }: any) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetch("/api/inventory/items").then(res => res.json()).then(setItems);
-        fetch("/api/warehouses").then(res => res.json()).then(setWarehouses);
+        fetchWithAuth("/api/inventory/items").then(res => res.json()).then(data => {
+            const list = data.items || (Array.isArray(data) ? data : []);
+            setItems(list);
+        });
+        fetchWithAuth("/api/warehouses").then(res => res.json()).then(data => {
+            const list = data.warehouses || (Array.isArray(data) ? data : []);
+            setWarehouses(list);
+        });
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const res = await fetch(`/api/inventory/transfer?from_wh=${fromWh}&to_wh=${toWh}&item_id=${selectedItem}&qty=${qty}`, {
+        const res = await fetchWithAuth(`/api/inventory/transfer?from_wh=${fromWh}&to_wh=${toWh}&item_id=${selectedItem}&qty=${qty}`, {
             method: "POST"
         });
         if (res.ok) {

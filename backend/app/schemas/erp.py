@@ -34,6 +34,7 @@ class ItemBase(BaseModel):
     sku: str
     name: str
     unit: str
+    selling_price: str = "0.0000"
     inventory_account_id: str
     cogs_account_id: str
     revenue_account_id: str
@@ -45,6 +46,7 @@ class Item(ItemBase):
     id: str
     current_qty: str = "0.0000"
     current_wac: str = "0.0000"
+    selling_price: str = "0.0000"
     total_value: str = "0.0000"
 
 # --- Journal Schemas ---
@@ -76,6 +78,7 @@ class GRNCreate(BaseModel):
     number: str
     date: Optional[datetime] = None
     lines: List[GRNLine]
+    supplier_id: Optional[str] = None # For AP Subledger linking
     supplier_account_id: str
 
 # --- Sales Transaction Schemas ---

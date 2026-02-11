@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, BarChart3, TrendingUp, Package, DollarSign, Activity } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { fetchWithAuth } from "@/lib/api";
 
 interface InventoryAnalyticsProps {
     onClose: () => void;
@@ -16,8 +17,8 @@ export default function InventoryAnalytics({ onClose }: InventoryAnalyticsProps)
 
     useEffect(() => {
         Promise.all([
-            fetch("/api/reports/inventory-valuation").then(res => res.json()),
-            fetch("/api/inventory/items").then(res => res.json())
+            fetchWithAuth("/api/reports/inventory-valuation").then(res => res.json()),
+            fetchWithAuth("/api/inventory/items").then(res => res.json())
         ]).then(([valuation, inventory]) => {
             setStats(valuation);
             setItems(inventory);

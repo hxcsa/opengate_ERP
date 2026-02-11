@@ -8,6 +8,10 @@ import {
     FileDown, Box
 } from "lucide-react";
 import React, { useCallback, memo } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { fetchWithAuth } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 const ReportLine = memo(({ label, icon, value, negative }: any) => (
     <div className="flex justify-between items-center group">
@@ -51,14 +55,25 @@ export default function Reports() {
     const [reports, setReports] = useState<any>(null);
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [authReady, setAuthReady] = useState(false);
+    const [authUser, setAuthUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, (user) => {
+            setAuthUser(user);
+            setAuthReady(true);
+        });
+        return () => unsub();
+    }, []);
 
     const loadData = useCallback(async () => {
+        if (!authReady || !authUser) return;
         try {
             const [isRes, bsRes, valRes, auditRes] = await Promise.all([
-                fetch("/api/reports/income-statement"),
-                fetch("/api/reports/balance-sheet"),
-                fetch("/api/reports/inventory-valuation"),
-                fetch("/api/audit/logs")
+                fetchWithAuth("/api/reports/income-statement"),
+                fetchWithAuth("/api/reports/balance-sheet"),
+                fetchWithAuth("/api/reports/inventory-valuation"),
+                fetchWithAuth("/api/audit/logs")
             ]);
 
             // Safe JSON parsing - check response.ok before parsing
@@ -91,6 +106,14 @@ export default function Reports() {
     }, [loadData]);
 
     if (loading) return <div className="p-20 text-center font-bold text-slate-400">Loading Financial Statements...</div>;
+
+    if (!authReady) {
+        return (
+            <div className="flex items-center justify-center h-[50vh]">
+                <Loader2 className="animate-spin text-indigo-600" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

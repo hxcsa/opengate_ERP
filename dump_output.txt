@@ -1,0 +1,94 @@
+Doc ID: IAj60AXLrV28bgZ25uUi
+  balance: '0.0000'
+  code: '22'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: True
+  name_ar: 'المطلوبات المتداولة'
+  name_en: 'Current Liabilities'
+  parent_id: 'eRHIxIjtBofjsVxUSQkG'
+  status: 'ACTIVE'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'LIABILITY'
+----------------------------------------
+Doc ID: MdPfMZmJWIaoLACRK8h8
+  active: True
+  balance: '0.0000'
+  code: '11'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: False
+  is_reconcilable: False
+  name_ar: 'يشسي'
+  name_en: 'eq'
+  parent_id: None
+  subledger_type: 'CUSTOMER'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'LIABILITY'
+----------------------------------------
+Doc ID: hHYsUcycsuYxjl24U8RM
+  active: True
+  balance: '0.0000'
+  code: '1122'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: False
+  is_reconcilable: False
+  name_ar: 'شش'
+  name_en: 'cc'
+  parent_id: None
+  subledger_type: 'CUSTOMER'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'LIABILITY'
+----------------------------------------
+Doc ID: oOGnuExlL4ZGqBLBzc0P
+  active: True
+  balance: '0.0000'
+  code: '11'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: False
+  is_reconcilable: False
+  name_ar: '11'
+  name_en: '3wds'
+  parent_id: None
+  subledger_type: 'CUSTOMER'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'LIABILITY'
+----------------------------------------
+Doc ID: vEIkmXDZOvmE1DUR7vAh
+  active: True
+  balance: '0.0000'
+  code: '1100'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: False
+  is_reconcilable: False
+  name_ar: 'مال'
+  name_en: 'cash'
+  parent_id: ''
+  subledger_type: 'CUSTOMER'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'LIABILITY'
+----------------------------------------
+Doc ID: xptjlTLwJLfbEyDEFEhh
+  active: True
+  balance: '0.0000'
+  code: '2211'
+  company_id: 'opengate_hq_001'
+  currency: 'IQD'
+  is_group: False
+  is_reconcilable: False
+  name_ar: 'ننن'
+  name_en: 'caxh'
+  parent_id: None
+  subledger_type: 'CUSTOMER'
+  total_credit: '0.0000'
+  total_debit: '0.0000'
+  type: 'ASSET'
+----------------------------------------

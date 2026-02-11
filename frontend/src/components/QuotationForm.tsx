@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Save, Plus, Trash2, FileText, User, DollarSign } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 interface QuotationFormProps {
     onClose: () => void;
@@ -20,8 +21,9 @@ export default function QuotationForm({ onClose, onSuccess }: QuotationFormProps
     });
 
     useEffect(() => {
-        fetch("/api/inventory/items").then(res => res.json()).then(data => {
-            if (Array.isArray(data)) setItems(data);
+        fetchWithAuth("/api/inventory/items").then(res => res.json()).then(data => {
+            const list = data.items || (Array.isArray(data) ? data : []);
+            setItems(list);
         });
     }, []);
 
@@ -61,9 +63,8 @@ export default function QuotationForm({ onClose, onSuccess }: QuotationFormProps
                 ...formData,
                 total: calculateTotal()
             };
-            const res = await fetch("/api/quotations", {
+            const res = await fetchWithAuth("/api/quotations", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
             if (res.ok) {

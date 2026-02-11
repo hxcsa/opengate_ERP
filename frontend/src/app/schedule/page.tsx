@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Calendar, Clock, Users, Megaphone, Plus, MapPin, X, Loader2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { fetchWithAuth } from "@/lib/api";
 
 const SHIFTS = ["08:00-16:00", "16:00-00:00", "00:00-08:00", "08:00-18:00"];
 
@@ -21,18 +22,15 @@ export default function SchedulePage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const token = await auth.currentUser?.getIdToken();
-                if (!token) { setLoading(false); return; }
+                if (!auth.currentUser) return; // Keep this check or let fetchWithAuth handle it
 
                 const idResult = await auth.currentUser?.getIdTokenResult();
                 const userRole = (idResult?.claims.role as string) || "viewer";
                 setRole(userRole);
 
-                const headers = { Authorization: `Bearer ${token}` };
-
                 const [shiftsRes, annRes] = await Promise.all([
-                    fetch("/api/scheduling/shifts", { headers }),
-                    fetch("/api/scheduling/announcements", { headers })
+                    fetchWithAuth("/api/scheduling/shifts"),
+                    fetchWithAuth("/api/scheduling/announcements")
                 ]);
 
                 if (shiftsRes.ok) setShifts(await shiftsRes.json());
@@ -40,8 +38,8 @@ export default function SchedulePage() {
 
                 if (userRole === "admin") {
                     const [usersRes, whRes] = await Promise.all([
-                        fetch("/api/users", { headers }),
-                        fetch("/api/warehouses", { headers })
+                        fetchWithAuth("/api/users"),
+                        fetchWithAuth("/api/warehouses")
                     ]);
                     if (usersRes.ok) setUsers(await usersRes.json());
                     if (whRes.ok) setWarehouses(await whRes.json());
@@ -56,10 +54,8 @@ export default function SchedulePage() {
     }, []);
 
     const addShift = async () => {
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch("/api/scheduling/shifts", {
+        const res = await fetchWithAuth("/api/scheduling/shifts", {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify(form)
         });
         if (res.ok) {
@@ -71,10 +67,8 @@ export default function SchedulePage() {
     };
 
     const addAnnouncement = async () => {
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch("/api/scheduling/announcements", {
+        const res = await fetchWithAuth("/api/scheduling/announcements", {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify(annForm)
         });
         if (res.ok) {

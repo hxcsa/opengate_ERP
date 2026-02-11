@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, ClipboardList, Package, Info } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 export default function ReconciliationForm({ onClose, onSuccess }: any) {
     const [items, setItems] = useState<any[]>([]);
@@ -13,14 +14,18 @@ export default function ReconciliationForm({ onClose, onSuccess }: any) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetch("/api/inventory/items").then(res => res.json()).then(setItems);
-        fetch("/api/warehouses").then(res => res.json()).then(setWarehouses);
+        fetchWithAuth("/api/inventory/items").then(res => res.json()).then(data => {
+            setItems(data.items || (Array.isArray(data) ? data : []));
+        });
+        fetchWithAuth("/api/warehouses").then(res => res.json()).then(data => {
+            setWarehouses(data.warehouses || (Array.isArray(data) ? data : []));
+        });
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const res = await fetch(`/api/inventory/adjust?item_id=${selectedItem}&warehouse_id=${warehouse}&qty=${qty}&reason=${encodeURIComponent(reason)}`, {
+        const res = await fetchWithAuth(`/api/inventory/adjust?item_id=${selectedItem}&warehouse_id=${warehouse}&qty=${qty}&reason=${encodeURIComponent(reason)}`, {
             method: "POST"
         });
         if (res.ok) {

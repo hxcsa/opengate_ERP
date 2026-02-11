@@ -1,0 +1,52 @@
+﻿python : C:\Users\razer\AppData\
+Local\Programs\Python\python39\l
+ib\site-packages\google\api_core
+\_python_version_support.py:246:
+ FutureWarning: You are using a 
+non-supported Python version 
+(3.9.13). Google will not post 
+any further updates to 
+google.api_core supporting this 
+Python version. Please upgrade 
+to the latest Python version, 
+or at least Python 3.10, and 
+then update google.api_core.
+At line:1 char:1
++ python 
+backend/verify_invoices.py > 
+test_output_4.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: (C:\Users\raze  
+  r\...oogle.api_core.:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+  warnings.warn(message, 
+FutureWarning)
+[Firebase] Initializing from file: C:\Users\razer\OneDrive\Desktop\ERP\backend\service_account.json
+[Firebase] Initialized successfully!
+Initializing Firebase...
+
+--- Test 1: Create Draft Invoice ---
+Created Invoice ID: LBqX1J1lQivEE05zw1Iz
+[PASS] Draft Created Successfully
+
+--- Test 2: Issue Invoice ---
+[PASS] Invoice Issued Successfully
+
+--- Test 3: Partial Payment ---
+[PASS] Partial Payment Recorded
+
+--- Test 4: Full Payment ---
+[PASS] Full Payment Recorded & Status Updated to PAID
+
+--- Test 5: List Filters ---
+[PASS] Found invoice in PAID list. Total results: 4
+
+--- Test 6: Voiding ---
+[PASS] Invoice Voided Successfully
+
+[SUCCESS] All Tests Passed!

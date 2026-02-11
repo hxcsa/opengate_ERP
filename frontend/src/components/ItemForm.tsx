@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Save, Package, Hash, Weight, Calculator, Building2 } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 interface ItemFormProps {
     onClose: () => void;
@@ -23,9 +24,8 @@ export default function ItemForm({ onClose, onSuccess }: ItemFormProps) {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch("/api/inventory/items", {
+            const res = await fetchWithAuth("/api/inventory/items", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
             });
             if (res.ok) {

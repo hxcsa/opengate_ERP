@@ -6,6 +6,7 @@ import {
     ArrowRightLeft, ClipboardCheck, FileText, Package2, RefreshCw,
     Clock, User, ChevronRight
 } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 interface LogEntry {
     id: string;
@@ -33,8 +34,8 @@ export default function ActivityLog() {
             try {
                 // Fetch stock ledger (comprehensive history)
                 const [ledgerRes, itemsRes] = await Promise.all([
-                    fetch("/api/inventory/history?limit=100"),
-                    fetch("/api/inventory/items?limit=500")
+                    fetchWithAuth("/api/inventory/history?limit=100"),
+                    fetchWithAuth("/api/inventory/items?limit=500")
                 ]);
 
                 const ledgerData = ledgerRes.ok ? await ledgerRes.json() : [];
@@ -134,8 +135,8 @@ export default function ActivityLog() {
                             key={type}
                             onClick={() => setFilter(type)}
                             className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${filter === type
-                                    ? "bg-slate-900 text-white shadow-lg"
-                                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                ? "bg-slate-900 text-white shadow-lg"
+                                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                                 }`}
                         >
                             {type === "ALL" ? "All" : type}
