@@ -15,6 +15,7 @@ import SuccessModal from "@/components/SuccessModal";
 export default function JournalsPage() {
     const { t, locale } = useLanguage();
     const [journals, setJournals] = useState<any[]>([]);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -26,7 +27,7 @@ export default function JournalsPage() {
         setLoading(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            const res = await fetch("/api/accounting/journals", {
+            const res = await fetch(`/api/accounting/journals?page=${page}&page_size=10`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -41,7 +42,7 @@ export default function JournalsPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [page]);
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -204,6 +205,25 @@ export default function JournalsPage() {
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1 || loading}
+                    className="px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+                >
+                    Previous
+                </button>
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Page {page}</span>
+                <button
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={journals.length < 10 || loading}
+                    className="px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+                >
+                    Next
+                </button>
             </div>
 
             {/* Modals */}

@@ -6,7 +6,8 @@ from app.core.firebase import get_db
 from app.core.auth import get_current_user
 from app.core.audit import get_audit_logger
 from app.schemas.erp import (
-    ItemCreate, GRNCreate, DeliveryNoteCreate, EmployeeCreate
+    ItemCreate, GRNCreate, DeliveryNoteCreate, EmployeeCreate,
+    WarehouseCreate, UOMCreate
 )
 from app.schemas.accounting import (
     AccountCreate, JournalEntryCreate, 
@@ -87,6 +88,18 @@ router.include_router(credit_notes_router, prefix="/credit-notes", tags=["Credit
 # ===================== EXPENSES =====================
 from app.api.expenses import router as expenses_router
 router.include_router(expenses_router, prefix="/expenses", tags=["Expenses"])
+
+# ===================== WAREHOUSE MODULE =====================
+from app.api.warehouse import router as warehouse_router
+router.include_router(warehouse_router, prefix="/warehouse", tags=["Warehouse"])
+
+# ===================== INTENTS =====================
+from app.api.intents import router as intents_router
+router.include_router(intents_router, prefix="/warehouse/intents", tags=["Intents"])
+
+# ===================== WAREHOUSE OPERATIONS =====================
+from app.api.operations import router as ops_router
+router.include_router(ops_router, prefix="/warehouse/ops", tags=["Warehouse Operations"])
 
 # ===================== ITEMS =====================
 @router.get("/inventory/items")
@@ -183,39 +196,7 @@ async def create_journal(data: JournalEntryCreate, user: dict = Depends(get_curr
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
 
-@router.get("/accounting/journals")
-async def get_journals(limit: int = 50, user: dict = Depends(get_current_user)):
-    """Get recent journals for the company with in-memory sorting to avoid index issues."""
-    try:
-        db = get_db()
-        company_id = user.get("company_id")
-        
-        # Fetch all (or a reasonable set) and sort in memory
-        # We use a simple query first
-        docs = db.collection("journal_entries")\
-            .where("company_id", "==", company_id)\
-            .stream()
-            
-        journals = []
-        for doc in docs:
-            data = doc.to_dict()
-            journals.append({"id": doc.id, **data})
-            
-        # Sort by date descending
-        def get_date(item):
-            d = item.get("date")
-            if hasattr(d, "timestamp"): # Firestore Timestamp
-                return d.timestamp()
-            if isinstance(d, str):
-                try: return datetime.fromisoformat(d.replace("Z", "+00:00")).timestamp()
-                except: return 0
-            return 0
-
-        journals.sort(key=get_date, reverse=True)
-        return journals[:limit]
-    except Exception as e:
-        print(f"❌ Error in GET /accounting/journals: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Journals handled in accounting.py
 
 # ===================== VOUCHERS =====================
 from app.api.vouchers import router as vouchers_router

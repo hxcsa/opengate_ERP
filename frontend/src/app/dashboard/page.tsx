@@ -100,6 +100,9 @@ export default function Dashboard() {
     const [chartData, setChartData] = useState<any[]>([]);
     const [journalEntries, setJournalEntries] = useState<any[]>([]);
     const [items, setItems] = useState<any[]>([]);
+    const [intents, setIntents] = useState<any[]>([]);
+    const [invoices, setInvoices] = useState<any[]>([]);
+
     const [showSaleModal, setShowSaleModal] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
@@ -119,24 +122,27 @@ export default function Dashboard() {
         if (!authReady || !authUser) return;
         setLoading(true);
         try {
-            const [journalsRes, itemsRes, statsRes, trendRes] = await Promise.all([
+            const [journalsRes, itemsRes, statsRes, trendRes, intentsRes, invoicesRes] = await Promise.all([
                 fetchWithAuth("/api/accounting/journals?limit=5"),
                 fetchWithAuth("/api/inventory/items?limit=5"),
                 fetchWithAuth("/api/reports/dashboard"),
-                fetchWithAuth("/api/reports/weekly-trend")
+                fetchWithAuth("/api/reports/weekly-trend"),
+                fetchWithAuth("/api/warehouse/intents?limit=5"),
+                fetchWithAuth("/api/sales/invoices?page_size=5")
             ]);
 
-            // Safe JSON parsing with error handling
-            const journalsData = journalsRes.ok ? await journalsRes.json() : { journals: [] };
+            const journalsData = journalsRes.ok ? await journalsRes.json() : [];
             const itemsData = itemsRes.ok ? await itemsRes.json() : { items: [] };
-            const statsData = statsRes.ok ? await statsRes.json() : { cashBalance: "0", lowStock: 0, todaySales: "0", pendingInvoices: 0 };
+            const statsData = statsRes.ok ? await statsRes.json() : null;
             const trendData = trendRes.ok ? await trendRes.json() : [];
+            const intentsData = intentsRes.ok ? await intentsRes.json() : [];
+            const invoicesData = invoicesRes.ok ? await invoicesRes.json() : { items: [] };
 
-            const journals = journalsData.journals || (Array.isArray(journalsData) ? journalsData : []);
-            const itemsList = itemsData.items || (Array.isArray(itemsData) ? itemsData : []);
+            setJournalEntries(Array.isArray(journalsData) ? journalsData : []);
+            setItems(itemsData.items || (Array.isArray(itemsData) ? itemsData : []));
+            setIntents(intentsData);
+            setInvoices(invoicesData.items || []);
 
-            setJournalEntries(journals);
-            setItems(itemsList);
             if (statsData) setStats(statsData);
             if (Array.isArray(trendData)) setChartData(trendData);
         } catch (error) {
@@ -144,9 +150,8 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [authReady, authUser]);
 
-    // CRITICAL: Call fetchData when component mounts!
     useEffect(() => {
         fetchData();
     }, [fetchData]);
@@ -201,12 +206,8 @@ export default function Dashboard() {
                             </div>
                             <h3 className="text-lg font-bold">Weekly Growth / النمو الأسبوعي</h3>
                         </div>
-                        <select className="text-xs bg-slate-50 border-none rounded-lg px-2 py-1 outline-none font-bold text-slate-500">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
-                        </select>
                     </div>
-                    <div className="h-[300px] w-full min-h-[300px]">
+                    <div className="h-[300px] w-full">
                         {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={chartData}>
@@ -221,125 +222,100 @@ export default function Dashboard() {
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="h-full flex items-center justify-center text-slate-400 text-sm font-medium">
-                                No trend data available
-                            </div>
+                            <div className="h-full flex items-center justify-center text-slate-400 text-sm font-medium">No trend data available</div>
                         )}
                     </div>
                 </div>
 
                 {/* Quick Actions */}
                 <div className="enterprise-card bg-slate-900 border-none text-white overflow-hidden relative">
-                    <div className="relative z-10">
+                    <div className="relative z-10 h-full flex flex-col">
                         <h3 className="text-lg font-bold mb-6">Quick Actions / اختصارات</h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            <QuickButton
-                                label="New Sale / بيع جديد"
-                                icon={<ArrowUpRight size={18} />}
-                                color="emerald"
-                                onClick={() => setShowSaleModal(true)}
-                            />
-                            <QuickButton
-                                label="New Purchase / شراء جديد"
-                                icon={<ArrowDownRight size={18} />}
-                                color="blue"
-                                onClick={() => setShowPurchaseModal(true)}
-                            />
-                            <QuickButton
-                                label="Stock Out / صرف مخزني"
-                                icon={<ArrowDownRight size={18} />}
-                                color="amber"
-                                onClick={() => setShowSaleModal(true)}
-                            />
+                        <div className="grid grid-cols-1 gap-3 flex-1">
+                            <QuickButton label="New Sale / بيع جديد" icon={<ArrowUpRight size={18} />} color="emerald" onClick={() => setShowSaleModal(true)} />
+                            <QuickButton label="New Purchase / شراء جديد" icon={<ArrowDownRight size={18} />} color="blue" onClick={() => setShowPurchaseModal(true)} />
+                            <QuickButton label="Stock Adjustment / تسوية مخزنية" icon={<TrendingUp size={18} />} color="amber" onClick={() => window.location.href = '/warehouse/adjustment'} />
                         </div>
                     </div>
-                    {/* Subtle background element */}
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+                </div>
+            </div>
+
+            {/* Module Summaries */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Warehouse Snapshot */}
+                <div className="enterprise-card border-none shadow-sm flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <Package size={18} className="text-blue-500" />
+                            <h3 className="text-base font-bold uppercase tracking-widest">Warehouse Snapshot</h3>
+                        </div>
+                        <a href="/warehouse" className="text-[10px] font-black text-blue-600 hover:underline">VIEW ALL</a>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+                        <div className="space-y-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Recent Items</p>
+                            <div className="space-y-2">
+                                {items.slice(0, 4).map(item => (
+                                    <div key={item.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-xs">
+                                        <span className="font-bold text-slate-700">{item.name}</span>
+                                        <span className={`font-black ${Number(item.current_qty) < 10 ? 'text-rose-600' : 'text-slate-500'}`}>{Number(item.current_qty)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Recent Intents</p>
+                            <div className="space-y-2">
+                                {intents.slice(0, 4).map(intent => (
+                                    <div key={intent.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-xs">
+                                        <span className="font-bold text-slate-700">#{intent.number}</span>
+                                        <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-100 font-black">{intent.status}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Accounting Snapshot */}
+                <div className="enterprise-card border-none shadow-sm flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <ShieldCheck size={18} className="text-emerald-500" />
+                            <h3 className="text-base font-bold uppercase tracking-widest">Accounting Snapshot</h3>
+                        </div>
+                        <a href="/accounting" className="text-[10px] font-black text-emerald-600 hover:underline">VIEW ALL</a>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+                        <div className="space-y-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Recent Journals</p>
+                            <div className="space-y-2">
+                                {journalEntries.slice(0, 4).map(je => (
+                                    <div key={je.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-xs">
+                                        <span className="font-bold text-slate-700">#{je.number}</span>
+                                        <span className="font-black text-emerald-600">+{Number(je.lines?.[0]?.debit || 0).toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Recent Invoices</p>
+                            <div className="space-y-2">
+                                {invoices.slice(0, 4).map(inv => (
+                                    <div key={inv.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-xs">
+                                        <span className="font-bold text-slate-700">{inv.invoice_number}</span>
+                                        <span className="font-black text-blue-600">{Number(inv.total_amount).toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {showSaleModal && <SaleForm onClose={() => setShowSaleModal(false)} onSuccess={fetchData} />}
             {showPurchaseModal && <PurchaseForm onClose={() => setShowPurchaseModal(false)} onSuccess={fetchData} />}
-
-            {/* Tables Section */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                <div className="enterprise-card border-none shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <History size={18} className="text-slate-400" />
-                        <h3 className="text-base font-bold">Recent Journals / القيود المحاسبية</h3>
-                    </div>
-                    <div className="overflow-auto">
-                        <table className="enterprise-table">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Description</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {journalEntries.length > 0 ? journalEntries.map((je: any) => (
-                                    <JournalRow key={je.id} je={je} />
-                                )) : (
-                                    <tr><td colSpan={4} className="text-center text-slate-400 py-12 text-sm font-medium">Looking for data...</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div className="enterprise-card border-none shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <Package size={18} className="text-slate-400" />
-                        <h3 className="text-base font-bold">Stock Status / حالة المخزن</h3>
-                    </div>
-                    <div className="overflow-auto">
-                        <table className="enterprise-table">
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Item</th>
-                                    <th>Stock</th>
-                                    <th>Alert</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.length > 0 ? items.map((item: any) => (
-                                    <StockRow key={item.id} item={item} />
-                                )) : (
-                                    <tr><td colSpan={4} className="text-center text-slate-400 py-12 text-sm font-medium">No items found</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* Admin Repair Access */}
-            <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex items-center justify-between mt-8">
-                <div>
-                    <h4 className="text-amber-800 font-bold flex items-center gap-2">
-                        <ShieldCheck size={18} />
-                        Permissions Issue? / مشكلة في الصلاحيات؟
-                    </h4>
-                    <p className="text-amber-600 text-xs mt-1 font-medium">If you are an admin but see 0s or restricted tabs, click to repair your account.</p>
-                </div>
-                <button
-                    onClick={async () => {
-                        const res = await fetchWithAuth("/api/setup/repair-admin", {
-                            method: "POST"
-                        });
-                        if (res.ok) {
-                            alert("Account promoted to Admin. Please refresh the page.");
-                            window.location.reload();
-                        }
-                    }}
-                    className="bg-amber-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-amber-700 transition-all text-sm shadow-md"
-                >
-                    Repair My Admin Role
-                </button>
-            </div>
         </div>
     );
 }

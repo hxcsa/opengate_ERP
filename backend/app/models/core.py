@@ -15,6 +15,27 @@ class AccountType(str, Enum):
     REVENUE = "REVENUE"
     EXPENSE = "EXPENSE"
 
+class StorageType(str, Enum):
+    DRY = "DRY"
+    COLD = "COLD"
+    FROZEN = "FROZEN"
+    OTHER = "OTHER"
+
+class UnitOfMeasure(BaseModel):
+    id: Optional[str] = None
+    code: str
+    name: str
+    description: Optional[str] = None
+    company_id: str
+
+class Warehouse(BaseModel):
+    id: Optional[str] = None
+    code: str
+    name: str
+    capacity: Optional[str] = None
+    location: Optional[str] = None
+    company_id: str
+
 class Account(BaseModel):
     id: Optional[str] = None # Firestore Doc ID
     code: str
@@ -44,12 +65,17 @@ class Item(BaseModel):
     id: Optional[str] = None
     sku: str
     name: str
+    barcode: Optional[str] = None
     description: Optional[str] = None
-    unit: str
+    unit: str # This should ideally be a UOM ID or Code
+    storage_type: StorageType = StorageType.DRY
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     
     inventory_account_id: str
     cogs_account_id: str
     revenue_account_id: str
+    customer_id: Optional[str] = None
+    company_id: str
 
 class StockMovement(BaseModel):
     id: Optional[str] = None

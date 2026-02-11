@@ -53,6 +53,8 @@ const TABS = [
 
 function AccountingInner() {
     const [snapshot, setSnapshot] = useState({ assets: "0", liabilities: "0", equity: "0" });
+    const [recentJournals, setRecentJournals] = useState<any[]>([]);
+    const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [authReady, setAuthReady] = useState(false);
     const [authUser, setAuthUser] = useState<User | null>(null);
@@ -73,8 +75,16 @@ function AccountingInner() {
         if (!authReady || !authUser) return;
         setLoading(true);
         try {
-            const bsRes = await fetchWithAuth("/api/reports/balance-sheet");
+            const [bsRes, jeRes, invRes] = await Promise.all([
+                fetchWithAuth("/api/reports/balance-sheet"),
+                fetchWithAuth("/api/accounting/journals?limit=5"),
+                fetchWithAuth("/api/sales/invoices?page_size=5")
+            ]);
+
             const bsData = bsRes.ok ? await bsRes.json() : {};
+            const jeData = jeRes.ok ? await jeRes.json() : [];
+            const invData = invRes.ok ? await invRes.json() : { items: [] };
+
             if (bsData) {
                 setSnapshot({
                     assets: bsData.total_assets || "0",
@@ -82,6 +92,8 @@ function AccountingInner() {
                     equity: bsData.total_equity || "0"
                 });
             }
+            setRecentJournals(jeData);
+            setRecentInvoices(invData.items || []);
         } catch (e) {
             console.error("Accounting fetch error:", e);
         } finally {
@@ -122,8 +134,8 @@ function AccountingInner() {
                         key={tab.id}
                         onClick={() => setTab(tab.id)}
                         className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id
-                                ? "bg-white text-slate-900 shadow-sm"
-                                : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
                             }`}
                     >
                         {tab.icon}
@@ -232,20 +244,65 @@ function AccountingInner() {
                             <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl"></div>
                         </div>
 
-                        <div className="enterprise-card border-none shadow-sm flex items-start gap-4 p-5">
-                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                                <ShieldCheck size={24} />
+                        {/* Recent Invoices Preview */}
+                        <div className="enterprise-card p-6 bg-white border-none shadow-sm h-full">
+                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <FileText size={18} className="text-emerald-500" />
+                                Recent Invoices / آخر الفواتير
+                            </h3>
+                            <div className="space-y-3">
+                                {recentInvoices.map((inv: any) => (
+                                    <div key={inv.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div>
+                                            <p className="text-xs font-black text-slate-800">{inv.invoice_number}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{inv.customer?.name || 'Walk-in'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs font-black text-emerald-600">{Number(inv.total_amount).toLocaleString()} IQD</p>
+                                            <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase">{inv.status}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                                {recentInvoices.length === 0 && <p className="text-center py-8 text-slate-300 font-bold italic">No recent invoices</p>}
                             </div>
-                            <div>
-                                <h4 className="font-black text-slate-800 text-sm mb-1">
-                                    {locale === 'ar' ? 'فحص السلامة' : 'Integrity Check'}
-                                </h4>
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                    {locale === 'ar'
-                                        ? 'دفتر الأستاذ المالي متوازن. جميع فحوصات ميزان المراجعة ناجحة للفترة الحالية.'
-                                        : 'Financial ledger is in balance. All trial balance checks passed for the current period.'}
-                                </p>
-                            </div>
+                        </div>
+                    </div>
+
+                    {/* Recent Transactions / Activity */}
+                    <div className="enterprise-card p-6 bg-white border-none shadow-sm">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                            <Book size={18} className="text-indigo-500" />
+                            Recent Activities / النشاطات الأخيرة
+                        </h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                        <th className="pb-4">Date</th>
+                                        <th className="pb-4">Ref</th>
+                                        <th className="pb-4 text-right">Debit</th>
+                                        <th className="pb-4 text-right">Credit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentJournals.map((je: any) => {
+                                        let dr = 0, cr = 0;
+                                        je.lines?.forEach((l: any) => {
+                                            dr += Number(l.debit || 0);
+                                            cr += Number(l.credit || 0);
+                                        });
+                                        return (
+                                            <tr key={je.id} className="text-xs group hover:bg-slate-50 transition-colors">
+                                                <td className="py-4 text-slate-500 font-bold">{new Date(je.date).toLocaleDateString()}</td>
+                                                <td className="py-4 font-black text-slate-800">#{je.reference || je.number}</td>
+                                                <td className="py-4 text-right font-black text-slate-600">{dr.toLocaleString()}</td>
+                                                <td className="py-4 text-right font-black text-slate-600">{cr.toLocaleString()}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            {recentJournals.length === 0 && <p className="text-center py-12 text-slate-300 font-bold italic">No recent journal entries</p>}
                         </div>
                     </div>
                 </div>

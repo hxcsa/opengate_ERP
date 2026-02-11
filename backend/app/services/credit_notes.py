@@ -144,4 +144,11 @@ class CreditNoteService:
         # Sort in memory to avoid index requirements for now
         docs = self.collection.where("company_id", "==", company_id).stream()
         results = [{"id": d.id, **d.to_dict()} for d in docs]
-        return sorted(results, key=lambda x: x.get("date", ""), reverse=True)
+        
+        def get_date_val(x):
+            d = x.get("date")
+            if hasattr(d, "timestamp"): return d.timestamp()
+            if isinstance(d, str): return d
+            return ""
+
+        return sorted(results, key=get_date_val, reverse=True)

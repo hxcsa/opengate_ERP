@@ -78,6 +78,7 @@ InventoryRow.displayName = "InventoryRow";
 export default function Inventory() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showSaleModal, setShowSaleModal] = useState(false);
     const [showTransferModal, setShowTransferModal] = useState(false);
@@ -101,7 +102,8 @@ export default function Inventory() {
         if (!authReady || !authUser) return;
         setLoading(true);
         try {
-            const res = await fetchWithAuth("/api/inventory/items");
+            // Using page and limit=10
+            const res = await fetchWithAuth(`/api/inventory/items?page=${page}&limit=10`);
             if (res.ok) {
                 const data = await res.json();
                 setItems(data.items || (Array.isArray(data) ? data : []));
@@ -111,7 +113,7 @@ export default function Inventory() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [authReady, authUser, page]); // Re-fetch when page changes
 
     useEffect(() => {
         fetchItems();
@@ -202,6 +204,25 @@ export default function Inventory() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-white">
+                    <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1 || loading}
+                        className="px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+                    >
+                        Previous
+                    </button>
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Page {page}</span>
+                    <button
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={items.length < 10 || loading}
+                        className="px-4 py-2 text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+                    >
+                        Next
+                    </button>
                 </div>
             </div>
 

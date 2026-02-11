@@ -179,3 +179,109 @@ class ReportingService:
                 "credit": str(sum(Decimal(l["credit"]) for l in report_lines))
             }
         }
+    async def get_general_ledger(self, company_id: str, account_id: str, from_date: datetime, to_date: datetime) -> Dict[str, Any]:
+        """
+        Calculates the general ledger for a specific account.
+        1. Fetch opening balance by summing all JEs before from_date.
+        2. Fetch all JEs in range.
+        3. Build running balance.
+        """
+        # 1. Get Account Details
+        acc_ref = self.db.collection("accounts").document(account_id)
+        acc_snap = acc_ref.get()
+        if not acc_snap.exists:
+            raise ValueError("Account not found")
+        acc_data = acc_snap.to_dict()
+
+        # Normalize dates for comparison
+        from datetime import timezone
+        if from_date.tzinfo is None:
+            from_date = from_date.replace(tzinfo=timezone.utc)
+        if to_date.tzinfo is None:
+            to_date = to_date.replace(tzinfo=timezone.utc)
+
+        # 2. Get Current Balance for back-calculation or just sum from start
+        # To be safe and avoid issues with missing historical data, we use the account's current balance
+        # as the ground truth at 'now' and work backwards, similar to customer statement.
+        current_balance = Decimal(acc_data.get("balance", "0"))
+
+        # 3. Fetch JEs for this account
+        # Optimization: Use flat_account_ids if it exists to query efficiently
+        je_query = self.db.collection("journal_entries")\
+            .where("company_id", "==", company_id)\
+            .where("status", "==", "POSTED")
+        
+        # We might want to filter by account if possible, but Firestore doesn't support 'in' with arrays nicely for many IDs.
+        # However, we can use array_contains if we store all account IDs in a flat array on the JE.
+        # For now, let's filter in-memory to be safe unless we are sure about the field name.
+        # Actually, looking at AccountingService.create_journal_entry, I see:
+        # "flat_account_ids": account_ids
+        je_query = je_query.where("flat_account_ids", "array_contains", account_id)
+        
+        jes = list(je_query.stream())
+        
+        report_lines = []
+        period_net_change = Decimal("0")
+        future_net_change = Decimal("0")
+        
+        for je in jes:
+            data = je.to_dict()
+            je_date = data.get("date")
+            if je_date.tzinfo is None:
+                je_date = je_date.replace(tzinfo=timezone.utc)
+            
+            # Find relevant lines in this JE
+            lines = [l for l in data.get("lines", []) if l.get("account_id") == account_id]
+            for l in lines:
+                debit = Decimal(str(l.get("debit", "0")))
+                credit = Decimal(str(l.get("credit", "0")))
+                net = debit - credit
+                
+                if je_date < from_date:
+                    pass # We will calculate opening balance by subtracting period and future from current
+                elif je_date <= to_date:
+                    report_lines.append({
+                        "id": je.id,
+                        "date": je_date.isoformat(),
+                        "number": data.get("number", ""),
+                        "description": data.get("description", ""),
+                        "memo": l.get("memo", ""),
+                        "debit": str(debit),
+                        "credit": str(credit),
+                        "net": net
+                    })
+                    period_net_change += net
+                else:
+                    future_net_change += net
+
+        # To calculate Opening Balance correctly:
+        # Current = sum(ALL)
+        # Opening_at_from_date = Current - sum(from_date to NOW)
+        # where sum(from_date to NOW) = period_net_change + future_net_change
+        opening_balance = current_balance - period_net_change - future_net_change
+        
+        # Sort and build running balance
+        report_lines.sort(key=lambda x: x["date"])
+        
+        running = opening_balance
+        final_lines = []
+        for line in report_lines:
+            running += line["net"]
+            final_lines.append({
+                **line,
+                "balance": str(running)
+            })
+            
+        return {
+            "account": {
+                "code": acc_data.get("code"),
+                "name_ar": acc_data.get("name_ar"),
+                "name_en": acc_data.get("name_en"),
+                "type": acc_data.get("type")
+            },
+            "opening_balance": str(opening_balance),
+            "items": final_lines,
+            "total_debit": str(sum(Decimal(l["debit"]) for l in final_lines)),
+            "total_credit": str(sum(Decimal(l["credit"]) for l in final_lines)),
+            "closing_balance": str(running)
+        }

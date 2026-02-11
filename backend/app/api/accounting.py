@@ -58,19 +58,39 @@ async def list_journals(
         
         if status:
             query = query.where("status", "==", status)
-        if date_from:
-            query = query.where("date", ">=", date_from)
-        if date_to:
-            query = query.where("date", "<=", date_to)
+        
+        # NOTE: We fetch and sort in memory to avoid Firestore index requirements for now
+        docs = query.stream()
+        results = []
+        for doc in docs:
+            data = doc.to_dict()
+            results.append({"id": doc.id, **data})
             
-        # Order by date desc
-        query = query.order_by("date", direction=firestore.Query.DESCENDING)
+        def get_date(item):
+            d = item.get("date")
+            if hasattr(d, "timestamp"):
+                return d.timestamp()
+            if isinstance(d, str):
+                try: return datetime.fromisoformat(d.replace("Z", "+00:00")).timestamp()
+                except: return 0
+            return 0
+
+        # Sort by date descending
+        results.sort(key=get_date, reverse=True)
         
+        # Filtering by date in memory
+        if date_from:
+            results = [r for r in results if str(r.get("date", "")) >= date_from]
+        if date_to:
+            results = [r for r in results if str(r.get("date", "")) <= date_to]
+
         # Pagination
-        docs = query.limit(page_size).offset((page - 1) * page_size).stream()
-        
-        return [{"id": d.id, **d.to_dict()} for d in docs]
+        offset = (page - 1) * page_size
+        return results[offset : offset + page_size]
     except Exception as e:
+        import traceback
+        print(f"❌ Error in list_journals: {str(e)}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/journals/{journal_id}")
@@ -80,3 +100,22 @@ async def get_journal(journal_id: str, user: dict = Depends(get_current_user)):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Journal entry not found")
     return {"id": doc.id, **doc.to_dict()}
+
+@router.get("/suppliers")
+async def list_suppliers(
+    search: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    try:
+        db = get_db()
+        company_id = user.get("company_id")
+        docs = db.collection("suppliers").where("company_id", "==", company_id).stream()
+        
+        results = [dict({"id": doc.id, **doc.to_dict()}) for doc in docs]
+        if search:
+            s = search.lower()
+            results = [r for r in results if s in r.get("name", "").lower()]
+            
+        return {"suppliers": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

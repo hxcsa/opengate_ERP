@@ -96,7 +96,9 @@ class PostingEngine:
         unit_cost: Decimal,
         doc_id: Optional[str] = None,
         doc_type: Optional[str] = None,
-        item_data: Optional[Dict[str, Any]] = None
+        item_data: Optional[Dict[str, Any]] = None,
+        batch_number: Optional[str] = None,
+        customer_id: Optional[str] = None
     ):
         """Records stock movement in Firestore transaction and updates WAC.
         IMPORTANT: This must be called from within a @firestore.transactional function.
@@ -139,7 +141,10 @@ class PostingEngine:
             "unit_cost": str(unit_cost),
             "valuation_rate": str(new_valuation_rate),
             "source_document_id": doc_id,
-            "source_document_type": doc_type
+            "source_document_type": doc_type,
+            "batch_number": batch_number,
+            "customer_id": customer_id,
+            "company_id": item_data.get("company_id")
         })
         
         # Update the provided item_data dictionary so subsequent calls in the same transaction

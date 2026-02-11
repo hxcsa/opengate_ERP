@@ -79,7 +79,7 @@ export default function GeneralLedgerPage() {
         } finally {
             setFetchingAccounts(false);
         }
-    }, [selectedAccountId]);
+    }, [authReady, authUser, selectedAccountId]);
 
     const fetchLedger = useCallback(async () => {
         if (!selectedAccountId) return;
@@ -96,7 +96,7 @@ export default function GeneralLedgerPage() {
         } finally {
             setLoading(false);
         }
-    }, [selectedAccountId, fromDate, toDate]);
+    }, [authReady, authUser, selectedAccountId, fromDate, toDate]);
 
     useEffect(() => {
         fetchAccounts();

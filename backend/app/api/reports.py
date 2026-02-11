@@ -21,14 +21,27 @@ async def get_trial_balance(
 @router.get("/customer-statement")
 async def get_customer_statement(
     customer_id: str,
-    from_date: datetime,
-    to_date: datetime,
+    from_date: str,
+    to_date: str,
     user: dict = Depends(get_current_user)
 ):
     try:
+        # Flexible Parsing
+        try:
+            start = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+        except:
+            start = datetime.strptime(from_date, "%Y-%m-%d")
+            
+        try:
+            end = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+        except:
+            # Set to end of day if only date provided
+            from datetime import time
+            d = datetime.strptime(to_date, "%Y-%m-%d")
+            end = datetime.combine(d.date(), time(23, 59, 59))
+
         service = ReportingService()
-        # Ensure to_date covers the whole day
-        return await service.get_customer_statement(user["company_id"], customer_id, from_date, to_date)
+        return await service.get_customer_statement(user["company_id"], customer_id, start, end)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

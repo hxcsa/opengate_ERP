@@ -86,7 +86,8 @@ class InventoryService:
                     "valuation_rate": str(new_wac),
                     "source_document_id": je_id,
                     "source_document_type": "GRN",
-                    "description": f"GRN In: {line.quantity} @ {line.unit_cost}"
+                    "description": f"GRN In: {line.quantity} @ {line.unit_cost}",
+                    "company_id": items_data_map[item_id].get("company_id")
                 }
                 
                 # Prepare Item Update (will be deduped/applied last)
@@ -251,7 +252,8 @@ class InventoryService:
                     "valuation_rate": str(wac),
                     "source_document_id": je_id,
                     "source_document_type": "DO",
-                    "description": f"Sale Out: {line.quantity}"
+                    "description": f"Sale Out: {line.quantity}",
+                    "company_id": items_data_map[item_id].get("company_id")
                 }
                 stock_moves_to_write.append({"ledger": ledger_entry})
                 
@@ -340,47 +342,62 @@ class InventoryService:
 
         return _execute(transaction, self.db, self.posting_engine, data)
 
-    def create_stock_transfer(self, from_wh: str, to_wh: str, item_id: str, quantity: float):
-        """Moves stock between warehouses."""
-        qty = Decimal(str(quantity))
+    def create_stock_transfer_v2(self, data: 'TransferCreate', doc_id: str):
+        """Moves stock between warehouses for multiple items."""
         transaction = self.db.transaction()
         
         @firestore.transactional
-        def _execute(transaction, db, posting_engine, item_id, from_wh, to_wh, qty):
-            item_doc = db.collection("items").document(item_id).get(transaction=transaction)
-            if not item_doc.exists: raise ValueError("Item not found")
-            item_data = item_doc.to_dict()
+        def _execute(transaction, db, posting_engine, data, doc_id):
+            item_ids = [line.item_id for line in data.items]
+            items_data = posting_engine.get_items_for_transaction(transaction, item_ids)
             
-            # 1. OUT from source
-            posting_engine.record_stock_movement(
-                transaction, item_id, from_wh, -qty, Decimal("0"), 
-                "TRANSFER-OUT", "TRF", item_data
-            )
-            # 2. IN to target
-            posting_engine.record_stock_movement(
-                transaction, item_id, to_wh, qty, Decimal(item_data["current_wac"]), 
-                "TRANSFER-IN", "TRF", item_data
-            )
+            for line in data.items:
+                qty = Decimal(str(line.quantity))
+                item_id = line.item_id
+                item_data = items_data.get(item_id)
+                if not item_data: raise ValueError(f"Item {item_id} not found")
+                
+                # 1. OUT from source
+                posting_engine.record_stock_movement(
+                    transaction, item_id, data.from_warehouse_id, -qty, Decimal("0"), 
+                    doc_id, "TRF", item_data, 
+                    batch_number=line.batch_number, 
+                    customer_id=data.customer_id
+                )
+                # 2. IN to target
+                posting_engine.record_stock_movement(
+                    transaction, item_id, data.to_warehouse_id, qty, Decimal(item_data["current_wac"]), 
+                    doc_id, "TRF", item_data, 
+                    batch_number=line.batch_number, 
+                    customer_id=data.customer_id
+                )
             return True
             
-        return _execute(transaction, self.db, self.posting_engine, item_id, from_wh, to_wh, qty)
+        return _execute(transaction, self.db, self.posting_engine, data, doc_id)
 
-    def adjust_stock(self, item_id: str, warehouse_id: str, quantity: float, reason: str):
-        """Manual adjustment (reconciliation). Creates JE."""
-        qty = Decimal(str(quantity))
+    def adjust_stock_v2(self, data: 'AdjustmentCreate', doc_id: str):
+        """Manual adjustment (reconciliation) for multiple items."""
         transaction = self.db.transaction()
         
         @firestore.transactional
-        def _execute(transaction, db, posting_engine, item_id, warehouse_id, qty, reason):
-            item_doc = db.collection("items").document(item_id).get(transaction=transaction)
-            item_data = item_doc.to_dict()
+        def _execute(transaction, db, posting_engine, data, doc_id):
+            item_ids = [line.item_id for line in data.items]
+            items_data = posting_engine.get_items_for_transaction(transaction, item_ids)
             
-            # Record movement
-            posting_engine.record_stock_movement(
-                transaction, item_id, warehouse_id, qty, Decimal(item_data["current_wac"]),
-                f"ADJ: {reason}", "ADJ", item_data
-            )
+            for line in data.items:
+                qty = Decimal(str(line.quantity))
+                item_id = line.item_id
+                item_data = items_data.get(item_id)
+                if not item_data: raise ValueError(f"Item {item_id} not found")
+                
+                # Record movement
+                posting_engine.record_stock_movement(
+                    transaction, item_id, data.warehouse_id, qty, Decimal(item_data["current_wac"]),
+                    doc_id, "ADJ", item_data, 
+                    batch_number=line.batch_number, 
+                    customer_id=data.customer_id
+                )
             return True
             
-        return _execute(transaction, self.db, self.posting_engine, item_id, warehouse_id, qty, reason)
+        return _execute(transaction, self.db, self.posting_engine, data, doc_id)
 

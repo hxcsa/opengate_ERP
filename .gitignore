@@ -21,7 +21,18 @@ ENV/
 service_account.json
 backend/service_account.json
 *.js.map
-*.js.map
+
+# Backend scripts
+backend/.env
+backend/massive_seed.py
+backend/seed_data.py
+backend/seed_accounting_data.py
+backend/sync_claims.py
+backend/repair_specific_admin.py
+backend/list_auth_users.py
+backend/debug_*.py
+backend/fix_data.py
+backend/backfill_ledger.py
 
 # OS
 .DS_Store

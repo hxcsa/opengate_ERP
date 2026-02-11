@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #2563eb;
+  --color-secondary: #64748b;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-surface: #ffffff;
+  --color-sidebar: #0f172a;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -12,6 +22,11 @@
   --accent: #3b82f6;
   --border: #e2e8f0;
   --card-bg: #ffffff;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --surface: #ffffff;
 }
 
 [dir="rtl"] {
@@ -99,7 +114,6 @@ body {
 }
 
 .form-input {
-  width: 100%;
   padding: 0.625rem 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -112,7 +126,7 @@ body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-/* Utility Classes for New Palette (since tailwind config is missing) */
+/* Utility Classes */
 .bg-primary {
   background-color: var(--primary) !important;
 }
@@ -125,12 +139,36 @@ body {
   border-color: var(--primary) !important;
 }
 
+.bg-secondary {
+  background-color: var(--secondary) !important;
+}
+
+.text-secondary {
+  color: var(--secondary) !important;
+}
+
 .bg-success {
   background-color: var(--success) !important;
 }
 
 .text-success {
   color: var(--success) !important;
+}
+
+.bg-warning {
+  background-color: var(--warning) !important;
+}
+
+.text-warning {
+  color: var(--warning) !important;
+}
+
+.bg-error {
+  background-color: var(--error) !important;
+}
+
+.text-error {
+  color: var(--error) !important;
 }
 
 .bg-surface {

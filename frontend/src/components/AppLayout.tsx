@@ -28,19 +28,33 @@ import {
     CalendarClock,
     Users,
     UserCog,
-    RefreshCw
+    RefreshCw,
+    Warehouse
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const ALL_ITEMS = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "accountant", "storekeeper", "viewer"] },
-    { label: "Schedule / الجدول", href: "/schedule", icon: CalendarClock, roles: ["admin", "accountant", "storekeeper", "viewer"] },
-    { label: "Invoices / الفواتير", href: "/invoices", icon: FileText, roles: ["admin", "accountant"] },
     { label: "Customers / الزبائن", href: "/customers", icon: Users, roles: ["admin", "accountant"] },
-    { label: "Inventory", href: "/inventory", icon: Box, roles: ["admin", "accountant", "storekeeper"] },
-    { label: "Sales / المبيعات", href: "/sales", icon: FileBarChart, roles: ["admin", "accountant"] },
-
-    { label: "Purchasing / المشتريات", href: "/purchasing", icon: Truck, roles: ["admin", "accountant", "storekeeper"] },
+    { label: "Employees / الموظفين", href: "/employees", icon: UserCog, roles: ["admin"] },
+    {
+        label: "Warehouse / المستودعات",
+        href: "/warehouse",
+        icon: Warehouse,
+        roles: ["admin", "accountant", "storekeeper"],
+        subItems: [
+            { label: "Overview", href: "/warehouse" },
+            { label: "Inventory", href: "/inventory" },
+            { label: "Products / المنتجات", href: "/warehouse/products" },
+            { label: "Warehouses / المخازن", href: "/warehouse/list" },
+            { label: "UOM / وحدات القياس", href: "/warehouse/uoms" },
+            { label: "Intents / الطلبات", href: "/warehouse/intents" },
+            { label: "Inbound / الواردات", href: "/warehouse/inbound" },
+            { label: "Outbound / الصادرات", href: "/warehouse/outbound" },
+            { label: "Transfers / التحويلات", href: "/warehouse/transfer" },
+            { label: "Adjustments / التسويات", href: "/warehouse/adjustment" },
+        ]
+    },
     {
         label: "Accounting",
         href: "/accounting",
@@ -48,6 +62,10 @@ const ALL_ITEMS = [
         roles: ["admin", "accountant"],
         subItems: [
             { label: "Overview", href: "/accounting" },
+            { label: "Invoices / الفواتير", href: "/invoices" },
+            { label: "Assets / الأصول", href: "/assets" },
+            { label: "Reports", href: "/reports" },
+            { label: "Activity", href: "/activity" },
             { label: "Categories / التصنيفات", href: "/accounting?tab=categories" },
             { label: "Payment Vouchers / سندات الصرف", href: "/accounting?tab=payments" },
             { label: "Receipts / سندات القبض", href: "/accounting?tab=receipts" },
@@ -60,10 +78,8 @@ const ALL_ITEMS = [
             { label: "Trial Balance", href: "/accounting/trial-balance" },
         ]
     },
-    { label: "Assets / الأصول", href: "/assets", icon: Building2, roles: ["admin", "accountant"] },
-    { label: "Reports", href: "/reports", icon: Globe, roles: ["admin", "accountant"] },
-    { label: "Activity", href: "/activity", icon: Activity, roles: ["admin", "accountant", "storekeeper"] },
-    { label: "Employees / الموظفين", href: "/employees", icon: UserCog, roles: ["admin"] },
+    { label: "Settings", href: "/users", icon: Settings, roles: ["admin"] },
+    { label: "Schedule / الجدول", href: "/schedule", icon: CalendarClock, roles: ["admin", "accountant", "storekeeper", "viewer"] },
 ];
 
 import { useRef } from "react";
@@ -74,6 +90,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
+    const [authLoading, setAuthLoading] = useState(true);
     const [role, setRole] = useState<string>("viewer");
     const [allowedTabs, setAllowedTabs] = useState<string[] | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -127,6 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // ... existing auth effect ...
     useEffect(() => {
         return onAuthStateChanged(auth, async (u) => {
+            setAuthLoading(false);
             if (!u && pathname !== "/login") {
                 router.push("/login");
             }
@@ -172,6 +190,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     if (pathname === "/login") return <>{children}</>;
+
+    if (authLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <RefreshCw className="animate-spin text-primary" size={40} />
+                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest animate-pulse">Initializing Session...</p>
+                </div>
+            </div>
+        );
+    }
 
 
     const menuItems = ALL_ITEMS.filter(item => {

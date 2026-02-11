@@ -250,9 +250,16 @@ export default function ActivityLog() {
 }
 
 function StatCard({ label, value, icon, color }: any) {
+    const bgColors: Record<string, string> = {
+        emerald: "bg-emerald-50",
+        rose: "bg-rose-50",
+        indigo: "bg-indigo-50",
+        amber: "bg-amber-50"
+    };
+
     return (
         <div className={`enterprise-card flex items-center gap-4`}>
-            <div className={`p-3 rounded-xl bg-${color}-50`}>
+            <div className={`p-3 rounded-xl ${bgColors[color] || "bg-slate-50"}`}>
                 {icon}
             </div>
             <div>
