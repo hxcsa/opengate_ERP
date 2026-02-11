@@ -240,7 +240,7 @@ function AdjustmentForm({ onClose, onSuccess, warehouses, customers, products }:
                                 {itemInput.item_id && (
                                     <div className="mt-1 px-1 flex justify-between items-center">
                                         <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find(w => w.id === formData.warehouse_id)?.name || 'Global'}`}
+                                            {loadingStock ? "Checking stock..." : `Available: ${currentStock ?? 0} units @ ${warehouses.find((w: any) => w.id === formData.warehouse_id)?.name || 'Global'}`}
                                         </p>
                                     </div>
                                 )}

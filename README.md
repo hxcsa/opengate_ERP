@@ -1,97 +1,114 @@
 # OpenGate ERP 🚀
 
-OpenGate ERP is a modern, high-performance Enterprise Resource Planning system designed for Iraqi compliance and international scalability. Built with **Next.js**, **FastAPI**, and **Firebase**, it provides a seamless, real-time experience for managing Accounting, Inventory, and Business Intelligence.
+OpenGate ERP is a high-performance, modern Enterprise Resource Planning (ERP) system tailored for the Iraqi market, built on a serverless, real-time architecture using **FastAPI**, **Next.js**, and **Firestore**.
 
 ---
 
-## 🌟 Key Features
+## 🏗 System Architecture
 
-- **Accounting**: Full-featured General Ledger with Trial Balance, Income Statement, and Balance Sheet (O(1) performance).
-- **Inventory**: Multi-warehouse tracking, WAC valuation, and real-time stock auditing (Bin Cards).
-- **Sales & Procurement**: End-to-end document lifecycle (Quotation -> Sales Order -> Delivery Note).
-- **Security & RBAC**: Granular role-based access control (Admin, Accountant, Storekeeper, Viewer).
-- **Audit Trails**: Immutable logs for every transaction and state change.
-- **Multilingual**: Automatic RTL/LTR support for English and Arabic.
-- **Multi-Currency**: Native support for USD and IQD transactions.
+The project follows a monorepo structure with a clear separation between the frontend (React/Next.js) and the backend (Python/FastAPI).
 
----
-
-## 🛠 Tech Stack
-
-- **Frontend**: Next.js 14+, Tailwind CSS, Recharts, Framer Motion.
-- **Backend**: FastAPI (Python 3.11), Uvicorn.
-- **Database**: Google Cloud Firestore (Serverless).
-- **Auth**: Firebase Authentication.
-- **Deployment**: Google Cloud Run (Backend), Vercel (Frontend).
-
----
-
-## 🚀 Deployment Guide (Step-by-Step)
-
-### 1. Backend Deployment (Option A: Railway - EASIEST 🏆)
-Railway is the most reliable way to deploy this monorepo.
-
-1.  **Railway Dashboard**: Go to **[Railway.app](https://railway.app)**.
-2.  **New Project**: Select "Deploy from GitHub repo".
-3.  **Automatic Detection**: Railway will find the `railway.json`.
-4.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT` (Paste raw JSON).
-5.  **Done**: It will build using the root as context.
-
-### 2. Backend Deployment (Option B: Google Cloud Run)
-1.  **Deploy new service**: 
-    *   **Source directory**: `.` (Root of repo)
-    *   **Dockerfile path**: `backend/Dockerfile`
-2.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
-
-### 3. Backend Deployment (Option C: Render)
-1.  **Docker Context**: `.` (Root of repo)
-2.  **Dockerfile Path**: `backend/Dockerfile`
-3.  **Environment Variables**: Add `FIREBASE_SERVICE_ACCOUNT`.
-4.  **Security (Environment Variables)**:
-    *   Go to **Variables & Secrets**.
-    *   Add variable `FIREBASE_SERVICE_ACCOUNT`.
-    *   **Value**: Paste the *entire* raw JSON content of your `service_account.json`.
-5.  **Performance**: Set "Minimum instances" to `1` if you want to avoid cold starts.
-
-### 2. Frontend Deployment (Vercel)
-Vercel is the best platform for Next.js applications.
-
-1.  **Vercel Dashboard**: Go to [vercel.com](https://vercel.com).
-2.  **Add New Project**: Import the `opengate_ERP` repository.
-3.  **Project Settings**:
-    *   **Framework**: Next.js.
-    *   **Root Directory**: Set to `frontend`.
-4.  **Environment Variables**:
-    *   `NEXT_PUBLIC_API_URL`: Paste your **Cloud Run Service URL** (e.g., `https://api-xxx-uc.a.run.app`).
-    *   Add your Firebase client keys (from Local `.env`):
-        *   `NEXT_PUBLIC_FIREBASE_API_KEY`
-        *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-        *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-        *   ...etc.
-5.  **Deploy**: Click Deploy.
-
----
-
-## 💻 Local Development
-
-### Backend (Python)
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # venv\Scripts\activate on Windows
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+```mermaid
+graph TD
+    User((User/Client)) --> Frontend[Next.js Frontend]
+    Frontend --> Backend[FastAPI Backend]
+    Backend --> Auth[Firebase Auth]
+    Backend --> DB[(Firestore NoSQL)]
+    Backend --> Services[Domain Services]
+    
+    subgraph "Domain Services"
+        Accounting[Accounting Service]
+        Inventory[Inventory Service]
+        Reporting[Reporting Service]
+        Posting[Posting Engine]
+    end
 ```
 
-### Frontend (Next.js)
-```bash
-cd frontend
-npm install
-npm run dev
-```
+### 🔐 Multi-Tenant Security Model
+We use a **"Shared Cabinet, Locked Drawers"** model:
+- **Identifier**: Every record is stamped with a `company_id`.
+- **Enforcement**: Backend middleware validates the user's **Firebase Custom Claims** on every request.
+- **Isolation**: Users can only read/write data associated with their specific `company_id`.
 
 ---
 
-## 📄 License
-Commercial / Private - All Rights Reserved.
-Developed for hxcsa.
+## 📂 Core Modules
+
+### 1. ⚖️ Accounting Module
+Built on a high-availability posting engine that ensures atomic transactions.
+- **General Ledger**: Real-time transaction tracking with running balances.
+- **Chart of Accounts (COA)**: Hierarchical account structure support (Iraqi Standardized COA compatible).
+- **Journal Entries**: Balanced double-entry bookkeeping with automated posting.
+- **Reporting**: O(1) performance for Balance Sheet, Trial Balance, and Customer Statements (using pre-aggregated balances).
+
+### 2. 📦 Warehouse & Inventory
+Manages the end-to-end lifecycle of goods.
+- **Product Management**: Support for multi-currency pricing (IQD/USD) and customer-specific associations.
+- **Stock Movements**: Inbound (Purchase) and Outbound (Sales) document flows.
+- **WAC Valuation**: Weighted Average Cost calculation handled in the background.
+- **Bin Cards**: Audit-ready history for every single item movement.
+
+### 3. 📊 Reporting engine
+- **Customer Statements**: Detailed debit/credit history with opening/closing balances.
+- **Inventory Analytics**: Low stock alerts, valuation summaries, and movement trends.
+
+---
+
+## 🛠 Technical Specifications
+
+### Tech Stack
+| Component | Technology | Rationale |
+| :--- | :--- | :--- |
+| **Frontend** | Next.js 14+ | Server-side rendering & optimized routing. |
+| **Backend** | FastAPI | High-performance asynchronous execution. |
+| **Database** | Firestore | Serverless NoSQL with real-time listeners. |
+| **Styling** | Vanilla CSS/Tailwind | Clean, responsive, and high-performance UI. |
+| **Auth** | Firebase Auth | Secure identity management & session handling. |
+
+### Performance Optimizations
+- **Pagination**: Implemented server-side pagination (Limit/Offset) for all large datasets (Products, Journals, Intents).
+- **In-Memory Sorting**: Used strategically to avoid Firestore composite index overhead during development.
+- **Transaction Safety**: All financial/stock updates are wrapped in Firestore Transactions to prevent `ReadAfterWrite` errors.
+
+---
+
+## 🚀 The Good, The Bad, & The Next
+
+### ✅ The Good (What's Done)
+- **Real-Time Sync**: Changes reflect across the dashboard instantly.
+- **Multi-Currency**: Seamless handling of USD/IQD exchange rates in accounting.
+- **High Performance**: Dashboard renders instantly even with hundreds of accounts.
+- **Mobile Responsive**: Fully usable on tablets and smartphones.
+
+### ❌ The Bad (Current Constraints)
+- **Index Dependencies**: Some complex filtered sorts currently rely on in-memory operations to avoid immediate Firestore index creation.
+- **Manual Calibration**: Initial company setup (Company ID claims) currently requires script execution.
+
+### 📈 The Next (Future Improvements)
+- **Automated Indexing**: Re-enable server-side sorting for all pages once composite indexes are deployed.
+- **Production-Grade Analytics**: Real-time Recharts dashboards for revenue and stock value.
+- **Admin Portal**: A dedicated UI for managing tenants, company IDs, and user roles.
+- **OCR Integration**: Image/PDF parsing for expense receipts and invoices.
+
+---
+
+## 💻 Local Setup
+
+1. **Backend**:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload
+   ```
+2. **Frontend**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+---
+
+## 📄 License & Ownership
+**Commercial / Private** - Developed for **hxcsa**.
+*Maintained by Antigravity AI.*
